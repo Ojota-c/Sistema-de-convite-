@@ -1,0 +1,43 @@
+# dependencias
+/node_modules
+/.pnp
+.pnp.*
+
+# build
+/.next/
+/out/
+/build
+next-env.d.ts
+*.tsbuildinfo
+
+# testes e cobertura
+/coverage
+
+# variaveis de ambiente (nunca comitar)
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# sistema operacional e editores
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# vercel
+.vercel
+
+# cache local da extensao Salesforce do VS Code
+# Recriado automaticamente enquanto o editor estiver aberto nesta pasta.
+# Nao tem relacao com este projeto e nao deve entrar no repositorio.
+.sf/
+.sfdx/

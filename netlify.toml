@@ -1,0 +1,18 @@
+# =============================================================================
+# Configuracao da Netlify
+#
+# A Netlify reconhece o Next.js sozinha e instala o adaptador por conta
+# propria, entao aqui vai so o essencial: travar a versao do Node.
+#
+# O Next 16 exige Node 20.9 ou mais novo. Sem esta linha, a Netlify pode
+# escolher uma versao antiga e o build quebra com uma mensagem confusa.
+#
+# De proposito NAO fixamos a versao do @netlify/plugin-nextjs: a propria
+# documentacao recomenda deixar que eles atualizem o adaptador a cada build.
+# =============================================================================
+
+[build]
+  command = "npm run build"
+
+[build.environment]
+  NODE_VERSION = "22"
