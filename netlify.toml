@@ -2,17 +2,36 @@
 # Configuracao da Netlify
 #
 # A Netlify reconhece o Next.js sozinha e instala o adaptador por conta
-# propria, entao aqui vai so o essencial: travar a versao do Node.
-#
-# O Next 16 exige Node 20.9 ou mais novo. Sem esta linha, a Netlify pode
-# escolher uma versao antiga e o build quebra com uma mensagem confusa.
-#
-# De proposito NAO fixamos a versao do @netlify/plugin-nextjs: a propria
-# documentacao recomenda deixar que eles atualizem o adaptador a cada build.
+# propria, entao aqui vai so o que ela nao tem como adivinhar.
 # =============================================================================
 
 [build]
   command = "npm run build"
 
 [build.environment]
+  # O Next 16 exige Node 20.9 ou mais novo. Sem esta linha a Netlify pode
+  # escolher uma versao antiga e o build quebra com uma mensagem confusa.
   NODE_VERSION = "22"
+
+  # ---------------------------------------------------------------------------
+  # Secrets scanning
+  # ---------------------------------------------------------------------------
+  # A Netlify procura, dentro do resultado do build, o valor de cada variavel
+  # de ambiente, e falha o deploy se achar algum. A ideia e boa, mas estas duas
+  # nao sao segredo e disparam alarme falso:
+  #
+  #   NEXT_PUBLIC_SITE_URL ..... publica por natureza. O prefixo NEXT_PUBLIC_
+  #                              existe justamente para o Next embutir o valor
+  #                              no pacote. Encontra-la ali e o esperado.
+  #
+  #   SUPABASE_STORAGE_BUCKET .. vale "convite", uma palavra que aparece em
+  #                              rota, nome de arquivo e texto de tela o tempo
+  #                              todo neste projeto. O alarme e pela palavra,
+  #                              nao por vazamento.
+  #
+  # As tres que sao segredo de verdade continuam sendo vasculhadas:
+  # SUPABASE_SERVICE_ROLE_KEY, ADMIN_PASSWORD e ADMIN_SESSION_SECRET. Se
+  # qualquer uma delas aparecer no build, o deploy falha, e deve falhar mesmo.
+  #
+  # Da para conferir isso localmente antes de publicar, com: npm run segredos
+  SECRETS_SCAN_OMIT_KEYS = "NEXT_PUBLIC_SITE_URL,SUPABASE_STORAGE_BUCKET"

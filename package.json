@@ -11,8 +11,9 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "verificar": "npm run lint && npm run typecheck && npm run test && npm run build",
-    "sql": "node scripts-sql.mjs"
+    "verificar": "npm run lint && npm run typecheck && npm run test && npm run build && npm run segredos",
+    "sql": "node scripts-sql.mjs",
+    "segredos": "node scripts-segredos.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.118.0",
