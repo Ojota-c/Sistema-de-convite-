@@ -18,7 +18,7 @@ import { supabase } from './supabase';
  */
 
 const COLUNAS_DO_CONVIDADO =
-  'id, name, phone, token, first_opened_at, last_opened_at, open_count, confirmed_at, declined_at, created_at, updated_at';
+  'id, name, phone, token, first_opened_at, last_opened_at, open_count, confirmed_at, declined_at, variant_code, created_at, updated_at';
 
 type LinhaComAcompanhantes = ConvidadoRow & {
   companions: AcompanhanteRow[] | null;
@@ -47,6 +47,7 @@ function paraDominio(linha: LinhaComAcompanhantes): Convidado {
       .sort((a, b) => a.position - b.position)
       .map((a) => ({ id: a.id, nome: a.name, posicao: a.position })),
     status: statusDoConvidado(marcas),
+    variante: linha.variant_code,
   };
 }
 
@@ -157,6 +158,40 @@ export async function removerConvidado(id: string): Promise<void> {
   if (error) {
     throw new Error(`Não foi possível remover o convidado: ${error.message}`);
   }
+}
+
+/** Define qual arte do convite um convidado recebe. */
+export async function definirVariante(
+  id: string,
+  codigo: string | null,
+): Promise<void> {
+  const { error } = await supabase()
+    .from('guests')
+    .update({ variant_code: codigo })
+    .eq('id', id);
+
+  if (error) {
+    throw new Error(`Não foi possível definir a variante: ${error.message}`);
+  }
+}
+
+/**
+ * Distribui uma variante para todos os convidados que ainda nao tem nenhuma.
+ * Serve para o organizador nao precisar clicar pessoa por pessoa quando a
+ * maioria vai receber o mesmo tamanho.
+ */
+export async function definirVarianteDosSemVariante(codigo: string): Promise<number> {
+  const { data, error } = await supabase()
+    .from('guests')
+    .update({ variant_code: codigo })
+    .is('variant_code', null)
+    .select('id');
+
+  if (error) {
+    throw new Error(`Não foi possível distribuir a variante: ${error.message}`);
+  }
+
+  return data?.length ?? 0;
 }
 
 /** Interpreta a resposta jsonb das funcoes do Postgres. */

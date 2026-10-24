@@ -3,6 +3,7 @@ import { headers } from 'next/headers';
 import { notFound } from 'next/navigation';
 import type { CSSProperties } from 'react';
 
+import { acharVariante, resolverArte } from '@/lib/arte';
 import { detectarSistema } from '@/lib/bots';
 import { descricaoDoEvento, linkGoogleAgenda, localCompleto } from '@/lib/calendario';
 import {
@@ -19,6 +20,7 @@ import { RespostaDoConvidado } from '@/components/convidado/RespostaDoConvidado'
 import { urlBase } from '@/server/ambiente';
 import { buscarConvidadoPorToken } from '@/server/convidados';
 import { buscarEvento } from '@/server/evento';
+import { listarVariantes } from '@/server/variantes';
 
 /**
  * A pagina do convidado.
@@ -43,14 +45,17 @@ export async function generateMetadata({ params }: PropsDaPagina): Promise<Metad
     return { title: 'Convite não encontrado', robots: { index: false, follow: false } };
   }
 
-  const [convidado, evento] = await Promise.all([
+  const [convidado, evento, variantes] = await Promise.all([
     buscarConvidadoPorToken(token),
     buscarEvento(),
+    listarVariantes(),
   ]);
 
   if (!convidado) {
     return { title: 'Convite não encontrado', robots: { index: false, follow: false } };
   }
+
+  const arte = resolverArte(evento, acharVariante(variantes, convidado.variante));
 
   const base = urlBase();
   const partes: string[] = [];
@@ -74,19 +79,19 @@ export async function generateMetadata({ params }: PropsDaPagina): Promise<Metad
       description: descricao,
       url: `${base}/c/${token}`,
       siteName: evento.titulo,
-      images: evento.caminhoDaImagem
+      images: arte.caminho
         ? [
             {
               url: `${base}/c/${token}/imagem`,
-              width: evento.larguraDaImagem ?? 1200,
-              height: evento.alturaDaImagem ?? 630,
+              width: arte.largura ?? 1200,
+              height: arte.altura ?? 630,
               alt: `Convite do evento ${evento.titulo}`,
             },
           ]
         : undefined,
     },
     twitter: {
-      card: evento.caminhoDaImagem ? 'summary_large_image' : 'summary',
+      card: arte.caminho ? 'summary_large_image' : 'summary',
       title: evento.titulo,
       description: descricao,
     },
@@ -97,13 +102,18 @@ export default async function PaginaDoConvite({ params }: PropsDaPagina) {
   const token = normalizarToken((await params).token);
   if (!token) notFound();
 
-  const [convidado, evento, cabecalhos] = await Promise.all([
+  const [convidado, evento, variantes, cabecalhos] = await Promise.all([
     buscarConvidadoPorToken(token),
     buscarEvento(),
+    listarVariantes(),
     headers(),
   ]);
 
   if (!convidado) notFound();
+
+  // A arte vem da variante do convidado. Sem variante definida, ou sem arte
+  // enviada ainda, cai na imagem geral do evento.
+  const arte = resolverArte(evento, acharVariante(variantes, convidado.variante));
 
   const base = urlBase();
   const local = localCompleto(evento.localNome, evento.localEndereco);
@@ -137,13 +147,13 @@ export default async function PaginaDoConvite({ params }: PropsDaPagina) {
     ) : null;
 
   const variaveisDaPaleta = paletaParaVariaveisCss(
-    evento.paleta,
+    arte.paleta,
   ) as unknown as CSSProperties;
 
   const coresDaCelebracao = [
-    evento.paleta.destaque,
-    evento.paleta.borda,
-    evento.paleta.tintaSuave,
+    arte.paleta.destaque,
+    arte.paleta.borda,
+    arte.paleta.tintaSuave,
   ];
 
   return (
@@ -154,7 +164,10 @@ export default async function PaginaDoConvite({ params }: PropsDaPagina) {
         <div className="entrada entrada-1">
           <CartaoDoConvite
             evento={evento}
-            caminhoDaImagem={evento.caminhoDaImagem ? `/c/${token}/imagem` : null}
+            caminhoDaImagem={arte.caminho ? `/c/${token}/imagem` : null}
+            larguraDaImagem={arte.largura}
+            alturaDaImagem={arte.altura}
+            sugestaoDePresente={arte.descricao}
             dataPorExtenso={dataPorExtenso}
             faixaDeHoras={faixaDeHoras}
           />

@@ -25,6 +25,8 @@ export interface LinhaDeConvidado {
   telefone: string | null;
   token: string;
   status: StatusConvidado;
+  /** Codigo da variante atribuida, ou string vazia quando nao ha nenhuma. */
+  variante: string;
   acompanhantes: string[];
   totalDePessoas: number;
   totalDeAberturas: number;
@@ -79,6 +81,7 @@ export function montarLinha(
     telefone: convidado.telefone,
     token: convidado.token,
     status: convidado.status,
+    variante: convidado.variante ?? '',
     acompanhantes: convidado.acompanhantes.map((a) => a.nome),
     totalDePessoas:
       convidado.status === 'confirmado' ? 1 + convidado.acompanhantes.length : 0,

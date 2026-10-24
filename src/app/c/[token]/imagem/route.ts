@@ -1,8 +1,10 @@
 import { createHash } from 'node:crypto';
 
+import { acharVariante, resolverArte } from '@/lib/arte';
 import { normalizarToken } from '@/lib/token';
-import { tokenExiste } from '@/server/convidados';
+import { buscarConvidadoPorToken } from '@/server/convidados';
 import { baixarImagemDoConvite, buscarEvento } from '@/server/evento';
+import { listarVariantes } from '@/server/variantes';
 
 /**
  * Serve a imagem do convite.
@@ -18,6 +20,10 @@ import { baixarImagemDoConvite, buscarEvento } from '@/server/evento';
  *
  * O token e conferido antes de qualquer leitura, para a rota nao virar um
  * proxy aberto de arquivos.
+ *
+ * A imagem servida e a da variante do convidado, de modo que cada pessoa
+ * receba a arte com o tamanho de fralda que foi atribuido a ela, tanto na
+ * pagina quanto na previa do WhatsApp.
  */
 export const dynamic = 'force-dynamic';
 
@@ -40,12 +46,19 @@ export async function GET(request: Request, { params }: Contexto) {
   const token = normalizarToken((await params).token);
   if (!token) return naoEncontrado();
 
-  const [existe, evento] = await Promise.all([tokenExiste(token), buscarEvento()]);
-  if (!existe || !evento.caminhoDaImagem) return naoEncontrado();
+  const [convidado, evento, variantes] = await Promise.all([
+    buscarConvidadoPorToken(token),
+    buscarEvento(),
+    listarVariantes(),
+  ]);
+  if (!convidado) return naoEncontrado();
+
+  const arte = resolverArte(evento, acharVariante(variantes, convidado.variante));
+  if (!arte.caminho) return naoEncontrado();
 
   // O caminho do arquivo ja carrega o instante do upload, entao ele muda
   // sempre que a imagem e trocada e serve bem como identidade da versao.
-  const etag = `"${createHash('sha1').update(evento.caminhoDaImagem).digest('hex')}"`;
+  const etag = `"${createHash('sha1').update(arte.caminho).digest('hex')}"`;
 
   const cacheControl =
     'public, max-age=600, s-maxage=86400, stale-while-revalidate=604800';
@@ -57,13 +70,13 @@ export async function GET(request: Request, { params }: Contexto) {
     });
   }
 
-  const imagem = await baixarImagemDoConvite(evento.caminhoDaImagem);
+  const imagem = await baixarImagemDoConvite(arte.caminho);
   if (!imagem) return naoEncontrado();
 
   return new Response(imagem.bytes, {
     status: 200,
     headers: {
-      'content-type': evento.tipoDaImagem ?? imagem.tipo,
+      'content-type': arte.tipo ?? imagem.tipo,
       'content-length': String(imagem.bytes.byteLength),
       'cache-control': cacheControl,
       etag,

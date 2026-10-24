@@ -48,7 +48,21 @@ export type ConvidadoRow = {
   open_count: number;
   confirmed_at: string | null;
   declined_at: string | null;
+  /** Qual arte do convite esta pessoa recebe. Nulo cai na imagem do evento. */
+  variant_code: string | null;
   created_at: string;
+  updated_at: string;
+};
+
+export type VarianteRow = {
+  code: string;
+  descricao: string;
+  posicao: number;
+  image_path: string | null;
+  image_mime: string | null;
+  image_width: number | null;
+  image_height: number | null;
+  palette: Json | null;
   updated_at: string;
 };
 
@@ -86,7 +100,15 @@ export type Database = {
         Row: ConvidadoRow;
         Insert: Partial<ConvidadoRow> & Pick<ConvidadoRow, 'name' | 'token'>;
         Update: Partial<ConvidadoRow>;
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: 'guests_variant_code_fkey';
+            columns: ['variant_code'];
+            isOneToOne: false;
+            referencedRelation: 'invite_variants';
+            referencedColumns: ['code'];
+          },
+        ];
       };
       companions: {
         Row: AcompanhanteRow;
@@ -101,6 +123,12 @@ export type Database = {
             referencedColumns: ['id'];
           },
         ];
+      };
+      invite_variants: {
+        Row: VarianteRow;
+        Insert: Partial<VarianteRow> & Pick<VarianteRow, 'code' | 'descricao'>;
+        Update: Partial<VarianteRow>;
+        Relationships: [];
       };
       rate_limits: {
         Row: RateLimitRow;

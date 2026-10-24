@@ -4,6 +4,7 @@ import { urlBase } from '@/server/ambiente';
 import { listarConvidados } from '@/server/convidados';
 import { buscarEvento } from '@/server/evento';
 import { exigirAdmin } from '@/server/sessao';
+import { listarVariantes } from '@/server/variantes';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,8 +17,12 @@ export const dynamic = 'force-dynamic';
 export default async function PaginaDeConvidados() {
   await exigirAdmin();
 
-  const [convidados, evento] = await Promise.all([listarConvidados(), buscarEvento()]);
+  const [convidados, evento, variantes] = await Promise.all([
+    listarConvidados(),
+    buscarEvento(),
+    listarVariantes(),
+  ]);
   const linhas = montarLinhas(convidados, evento, urlBase());
 
-  return <GerenciarConvidados linhas={linhas} />;
+  return <GerenciarConvidados linhas={linhas} variantes={variantes} />;
 }

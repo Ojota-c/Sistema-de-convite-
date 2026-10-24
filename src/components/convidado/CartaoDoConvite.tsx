@@ -4,6 +4,14 @@ export interface CartaoDoConviteProps {
   evento: Evento;
   /** Caminho da rota que serve a imagem deste convite. */
   caminhoDaImagem: string | null;
+  larguraDaImagem: number | null;
+  alturaDaImagem: number | null;
+  /**
+   * Detalhe que muda de convidado para convidado, como "Fraldas tamanho M".
+   * Aparece em texto, e nao so dentro da arte, porque quem usa leitor de tela
+   * nao enxerga a letra desenhada na imagem.
+   */
+  sugestaoDePresente: string | null;
   dataPorExtenso: string | null;
   faixaDeHoras: string | null;
 }
@@ -19,6 +27,9 @@ export interface CartaoDoConviteProps {
 export function CartaoDoConvite({
   evento,
   caminhoDaImagem,
+  larguraDaImagem,
+  alturaDaImagem,
+  sugestaoDePresente,
   dataPorExtenso,
   faixaDeHoras,
 }: CartaoDoConviteProps) {
@@ -32,8 +43,8 @@ export function CartaoDoConvite({
           <img
             src={caminhoDaImagem}
             alt={`Convite do evento ${evento.titulo}`}
-            width={evento.larguraDaImagem ?? undefined}
-            height={evento.alturaDaImagem ?? undefined}
+            width={larguraDaImagem ?? undefined}
+            height={alturaDaImagem ?? undefined}
             className="block h-auto w-full"
             fetchPriority="high"
             decoding="async"
@@ -78,6 +89,12 @@ export function CartaoDoConvite({
                   </span>
                 ) : null}
               </dd>
+            </div>
+          ) : null}
+          {sugestaoDePresente ? (
+            <div>
+              <dt className="sobretitulo text-[0.68rem]">Sugestão de presente</dt>
+              <dd className="texto-destacado mt-1.5">{sugestaoDePresente}</dd>
             </div>
           ) : null}
         </dl>

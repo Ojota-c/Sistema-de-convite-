@@ -245,6 +245,15 @@ export const paletaSchema = z.object({
 export const TIPOS_DE_IMAGEM = ['image/jpeg', 'image/png', 'image/webp'] as const;
 export const TAMANHO_MAXIMO_IMAGEM = 5 * 1024 * 1024;
 
+/** Codigo de variante: curto, so letra e numero, sempre em maiuscula. */
+export const codigoDeVarianteSchema = z
+  .string({ error: 'Informe a variante.' })
+  .trim()
+  .min(1, { error: 'Informe a variante.' })
+  .max(8, { error: 'O código da variante é curto demais para caber tanto texto.' })
+  .regex(/^[A-Za-z0-9]+$/, { error: 'A variante aceita apenas letras e números.' })
+  .transform((valor) => valor.toUpperCase());
+
 export const uploadImagemSchema = z.object({
   largura: z.coerce.number().int().min(1).max(10000),
   altura: z.coerce.number().int().min(1).max(10000),

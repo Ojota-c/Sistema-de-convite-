@@ -23,6 +23,23 @@ export interface Evento {
   atualizadoEm: Date;
 }
 
+/**
+ * Uma arte do convite. Todas iguais menos por um detalhe, no caso do
+ * Chá da Flora o tamanho da fralda sugerida.
+ */
+export interface Variante {
+  codigo: string;
+  descricao: string;
+  posicao: number;
+  caminhoDaImagem: string | null;
+  tipoDaImagem: string | null;
+  larguraDaImagem: number | null;
+  alturaDaImagem: number | null;
+  paleta: Paleta | null;
+  /** Falso enquanto o organizador nao tiver enviado a arte desta variante. */
+  temImagem: boolean;
+}
+
 export interface Acompanhante {
   id: string;
   nome: string;
@@ -44,6 +61,8 @@ export interface Convidado {
   criadoEm: Date;
   acompanhantes: Acompanhante[];
   status: StatusConvidado;
+  /** Codigo da variante atribuida, ou null se ainda nao foi definida. */
+  variante: string | null;
 }
 
 /** Numeros do topo do painel de acompanhamento. */

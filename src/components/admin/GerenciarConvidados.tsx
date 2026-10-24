@@ -5,11 +5,14 @@ import { useActionState, useEffect, useRef, useState } from 'react';
 import {
   adicionarConvidadoAction,
   adicionarEmLoteAction,
+  definirVarianteAction,
+  distribuirVarianteAction,
   editarConvidadoAction,
   removerConvidadoAction,
 } from '@/app/admin/acoes';
 import { normalizarBusca } from '@/lib/painel';
 import type { LinhaDeConvidado } from '@/lib/visao';
+import type { Variante } from '@/types/dominio';
 import { formatarTelefone } from '@/lib/whatsapp';
 import { FORMULARIO_OCIOSO, type EstadoDeFormulario } from '@/types/dominio';
 
@@ -165,11 +168,121 @@ function AdicionarEmLote() {
   );
 }
 
+/**
+ * Tamanho da fralda de um convidado.
+ *
+ * Salva na hora em que o valor muda, sem botao de confirmar: e uma escolha
+ * entre tres opcoes, e obrigar um clique a mais para cada pessoa da lista
+ * seria cansativo numa festa com dezenas de convidados.
+ */
+function SeletorDeVariante({
+  linha,
+  variantes,
+}: {
+  linha: LinhaDeConvidado;
+  variantes: Variante[];
+}) {
+  const [resultado, salvar, salvando] = useActionState(
+    definirVarianteAction,
+    FORMULARIO_OCIOSO,
+  );
+  const formulario = useRef<HTMLFormElement | null>(null);
+
+  if (variantes.length === 0) return null;
+
+  return (
+    <form ref={formulario} action={salvar} className="flex items-center gap-2">
+      <input type="hidden" name="id" value={linha.id} />
+      <label className="apenas-leitor-de-tela" htmlFor={`variante-${linha.id}`}>
+        Tamanho da fralda de {linha.nome}
+      </label>
+      <select
+        id={`variante-${linha.id}`}
+        name="codigo"
+        className="campo min-h-0 w-auto py-1.5 text-sm"
+        defaultValue={linha.variante}
+        disabled={salvando}
+        onChange={() => formulario.current?.requestSubmit()}
+      >
+        <option value="">Sem tamanho</option>
+        {variantes.map((v) => (
+          <option key={v.codigo} value={v.codigo}>
+            {v.descricao}
+          </option>
+        ))}
+      </select>
+      {salvando ? (
+        <span className="text-xs text-[var(--cor-tinta-suave)]">salvando...</span>
+      ) : null}
+      <span aria-live="polite" className="apenas-leitor-de-tela">
+        {resultado.estado === 'sucesso' ? (resultado.mensagem ?? 'Salvo.') : null}
+        {resultado.estado === 'erro' ? resultado.mensagem : null}
+      </span>
+      {resultado.estado === 'erro' ? (
+        <span className="text-xs text-[#8a4034]">{resultado.mensagem}</span>
+      ) : null}
+    </form>
+  );
+}
+
+/** Atribui um tamanho de uma vez a todos que ainda nao tem nenhum. */
+function DistribuirVariante({ variantes }: { variantes: Variante[] }) {
+  const [resultado, distribuir, distribuindo] = useActionState(
+    distribuirVarianteAction,
+    FORMULARIO_OCIOSO,
+  );
+
+  if (variantes.length === 0) return null;
+
+  return (
+    <div className="painel-caixa px-4 py-4">
+      <p className="rotulo">Atalho</p>
+      <p className="text-sm text-[var(--cor-tinta-suave)]">
+        Dá para definir de uma vez o tamanho de quem ainda está sem nenhum, e
+        depois ajustar caso a caso.
+      </p>
+
+      <form action={distribuir} className="mt-3 flex flex-wrap items-center gap-2">
+        <label className="apenas-leitor-de-tela" htmlFor="distribuir-codigo">
+          Tamanho a distribuir
+        </label>
+        <select
+          id="distribuir-codigo"
+          name="codigo"
+          className="campo min-h-0 w-auto py-1.5 text-sm"
+          defaultValue={variantes[0]?.codigo ?? ''}
+        >
+          {variantes.map((v) => (
+            <option key={v.codigo} value={v.codigo}>
+              {v.descricao}
+            </option>
+          ))}
+        </select>
+        <button
+          type="submit"
+          className="botao botao-contorno px-3 text-sm"
+          disabled={distribuindo}
+        >
+          {distribuindo ? 'Distribuindo...' : 'Aplicar a quem está sem tamanho'}
+        </button>
+      </form>
+
+      <Aviso estado={resultado} />
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Uma linha da lista
 // ---------------------------------------------------------------------------
 
-function FichaDeConvidado({ linha }: { linha: LinhaDeConvidado }) {
+function FichaDeConvidado({
+  linha,
+  variantes,
+}: {
+  linha: LinhaDeConvidado;
+  variantes: Variante[];
+}) {
   const [editando, setEditando] = useState(false);
   const [confirmandoRemocao, setConfirmandoRemocao] = useState(false);
 
@@ -265,6 +378,10 @@ function FichaDeConvidado({ linha }: { linha: LinhaDeConvidado }) {
       </div>
 
       <div className="mt-4">
+        <SeletorDeVariante linha={linha} variantes={variantes} />
+      </div>
+
+      <div className="mt-4">
         <BotoesDeCompartilhar
           nome={linha.nome}
           link={linha.link}
@@ -320,7 +437,13 @@ function FichaDeConvidado({ linha }: { linha: LinhaDeConvidado }) {
 // A tela inteira
 // ---------------------------------------------------------------------------
 
-export function GerenciarConvidados({ linhas }: { linhas: LinhaDeConvidado[] }) {
+export function GerenciarConvidados({
+  linhas,
+  variantes,
+}: {
+  linhas: LinhaDeConvidado[];
+  variantes: Variante[];
+}) {
   const [busca, setBusca] = useState('');
 
   const termo = normalizarBusca(busca);
@@ -346,6 +469,12 @@ export function GerenciarConvidados({ linhas }: { linhas: LinhaDeConvidado[] }) 
             <AdicionarEmLote />
           </div>
         </div>
+
+        {linhas.length > 0 ? (
+          <div className="mt-4">
+            <DistribuirVariante variantes={variantes} />
+          </div>
+        ) : null}
       </section>
 
       <section aria-labelledby="titulo-lista-convidados">
@@ -390,7 +519,7 @@ export function GerenciarConvidados({ linhas }: { linhas: LinhaDeConvidado[] }) 
         ) : (
           <ul className="mt-4 space-y-3">
             {visiveis.map((linha) => (
-              <FichaDeConvidado key={linha.id} linha={linha} />
+              <FichaDeConvidado key={linha.id} linha={linha} variantes={variantes} />
             ))}
           </ul>
         )}

@@ -45,6 +45,7 @@ const CONVIDADO: Convidado = {
     { id: 'a2', nome: 'Lia', posicao: 1 },
   ],
   status: 'confirmado',
+  variante: 'P',
 };
 
 const BASE = 'https://exemplo.com';

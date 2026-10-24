@@ -1,10 +1,12 @@
 import { ListaDeAcompanhamento } from '@/components/admin/ListaDeAcompanhamento';
+import { contarPorVariante } from '@/lib/arte';
 import { resumir } from '@/lib/painel';
 import { montarLinhas } from '@/lib/visao';
 import { urlBase } from '@/server/ambiente';
 import { listarConvidados } from '@/server/convidados';
 import { buscarEvento } from '@/server/evento';
 import { exigirAdmin } from '@/server/sessao';
+import { listarVariantes } from '@/server/variantes';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,9 +16,14 @@ export const dynamic = 'force-dynamic';
 export default async function PaginaDeAcompanhamento() {
   await exigirAdmin();
 
-  const [convidados, evento] = await Promise.all([listarConvidados(), buscarEvento()]);
+  const [convidados, evento, variantes] = await Promise.all([
+    listarConvidados(),
+    buscarEvento(),
+    listarVariantes(),
+  ]);
   const resumo = resumir(convidados);
   const linhas = montarLinhas(convidados, evento, urlBase());
+  const porVariante = contarPorVariante(convidados, variantes);
 
   const cartoes = [
     { rotulo: 'Convidados', valor: resumo.cadastrados, nota: 'cadastrados' },
@@ -61,6 +68,37 @@ export default async function PaginaDeAcompanhamento() {
           </p>
         ) : null}
       </section>
+
+      {porVariante.length > 0 && convidados.length > 0 ? (
+        <section aria-labelledby="titulo-variantes">
+          <h2 id="titulo-variantes" className="titulo-secao">
+            Fraldas por tamanho
+          </h2>
+          <p className="mt-2 text-sm text-[var(--cor-tinta-suave)]">
+            Quantas pessoas receberam cada arte. Serve para estimar quanto vai
+            chegar de cada tamanho.
+          </p>
+
+          <dl className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {porVariante.map((linha) => (
+              <div
+                key={linha.codigo || 'sem-tamanho'}
+                className={`painel-caixa px-4 py-4 ${
+                  linha.codigo === '' && linha.total > 0
+                    ? 'border-[#e4d4ab] bg-[#fcf6e8]'
+                    : ''
+                }`}
+              >
+                <dt className="sobretitulo text-[0.68rem]">{linha.descricao}</dt>
+                <dd className="painel-numero mt-2">{linha.total}</dd>
+                <p className="mt-1 text-xs text-[var(--cor-tinta-suave)]">
+                  {linha.total === 1 ? 'convidado' : 'convidados'}
+                </p>
+              </div>
+            ))}
+          </dl>
+        </section>
+      ) : null}
 
       <ListaDeAcompanhamento linhas={linhas} />
     </div>

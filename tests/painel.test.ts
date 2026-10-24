@@ -25,6 +25,7 @@ function convidado(parcial: Partial<Convidado> & { nome: string }): Convidado {
     criadoEm: new Date('2027-01-01T12:00:00.000Z'),
     acompanhantes: [],
     status: 'nao-abriu',
+    variante: null,
   };
 
   const montado = { ...base, ...parcial };
