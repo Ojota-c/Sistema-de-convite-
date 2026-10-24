@@ -26,6 +26,23 @@ const LADO_DA_AMOSTRA = 72;
 const QUALIDADE_INICIAL = 0.86;
 const QUALIDADE_MINIMA = 0.55;
 
+/**
+ * A arte sai sempre em JPEG, mesmo o WebP comprimindo bem melhor.
+ *
+ * O motivo e a previa do link no WhatsApp. O WebP so e lido por versoes
+ * recentes do aplicativo, e o convite vai para familia inteira, com celular
+ * de todo tipo. Em JPEG a previa aparece em qualquer versao.
+ */
+const TIPO_DE_SAIDA = 'image/jpeg';
+
+/**
+ * Teto de tamanho da arte.
+ *
+ * Previa do WhatsApp costuma falhar acima de 300 KB, principalmente para quem
+ * esta no 4G. Deixamos uma folga confortavel abaixo disso.
+ */
+const TAMANHO_ALVO = 260 * 1024;
+
 export interface ImagemProcessada {
   blob: Blob;
   tipo: string;
@@ -55,12 +72,6 @@ function paraBlob(
   return new Promise((resolver) => {
     canvas.toBlob((blob) => resolver(blob), tipo, qualidade);
   });
-}
-
-/** Descobre se o navegador consegue codificar WebP, que comprime bem melhor. */
-function suportaWebp(): boolean {
-  const canvas = criarCanvas(1, 1);
-  return canvas.toDataURL('image/webp').startsWith('data:image/webp');
 }
 
 export async function processarImagem(arquivo: File): Promise<ImagemProcessada> {
@@ -119,15 +130,15 @@ export async function processarImagem(arquivo: File): Promise<ImagemProcessada> 
     }
 
     // ----- compressao -----
-    const tipo = suportaWebp() ? 'image/webp' : 'image/jpeg';
+    const tipo = TIPO_DE_SAIDA;
 
     let qualidade = QUALIDADE_INICIAL;
     let blob = await paraBlob(canvas, tipo, qualidade);
 
-    // Caso raro: mesmo reduzida a imagem ainda passa do limite. Baixa a
-    // qualidade por passos ate caber, em vez de recusar o arquivo.
-    while (blob && blob.size > TAMANHO_MAXIMO_IMAGEM && qualidade > QUALIDADE_MINIMA) {
-      qualidade -= 0.1;
+    // Desce a qualidade por passos ate caber no alvo. O limite que importa
+    // aqui e o do WhatsApp, bem menor que os 5 MB aceitos pelo servidor.
+    while (blob && blob.size > TAMANHO_ALVO && qualidade > QUALIDADE_MINIMA) {
+      qualidade -= 0.06;
       blob = await paraBlob(canvas, tipo, qualidade);
     }
 
