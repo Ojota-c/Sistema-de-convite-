@@ -3,6 +3,7 @@ import 'server-only';
 import { cache } from 'react';
 
 import { horaLocalParaUtc, paraData } from '@/lib/datas';
+import { lerLinhaDoLink, type LinhaDoLink } from '@/lib/linha-do-link';
 import { lerPaleta, type Paleta } from '@/lib/paleta';
 import type { DadosEvento } from '@/lib/validacao';
 import type { EventoRow } from '@/types/db';
@@ -17,7 +18,7 @@ import { balde, supabase } from './supabase';
 const ID_DO_EVENTO = 1;
 
 const COLUNAS_DO_EVENTO =
-  'id, title, starts_at, ends_at, location_name, location_address, notes, invite_message, image_path, image_mime, image_width, image_height, palette, max_companions, timezone, updated_at';
+  'id, title, starts_at, ends_at, location_name, location_address, notes, invite_message, image_path, image_mime, image_width, image_height, palette, max_companions, timezone, link_na_arte, updated_at';
 
 /** Evento vazio, usado antes de o organizador preencher qualquer coisa. */
 function eventoVazio(): Evento {
@@ -36,6 +37,7 @@ function eventoVazio(): Evento {
     paleta: lerPaleta(null),
     maxAcompanhantes: 3,
     fuso: 'America/Sao_Paulo',
+    linhaDoLink: lerLinhaDoLink(null),
     atualizadoEm: new Date(0),
   };
 }
@@ -56,6 +58,7 @@ function paraDominio(linha: EventoRow): Evento {
     paleta: lerPaleta(linha.palette),
     maxAcompanhantes: linha.max_companions,
     fuso: linha.timezone,
+    linhaDoLink: lerLinhaDoLink(linha.link_na_arte),
     atualizadoEm: paraData(linha.updated_at) ?? new Date(0),
   };
 }
@@ -103,6 +106,18 @@ export async function salvarEvento(dados: DadosEvento): Promise<void> {
 
   if (error) {
     throw new Error(`Não foi possível salvar o evento: ${error.message}`);
+  }
+}
+
+/** Grava onde o endereco deve ser escrito dentro da arte. */
+export async function salvarLinhaDoLink(linha: LinhaDoLink): Promise<void> {
+  const { error } = await supabase()
+    .from('event')
+    .update({ link_na_arte: { ...linha } })
+    .eq('id', ID_DO_EVENTO);
+
+  if (error) {
+    throw new Error(`Não foi possível salvar a posição do link: ${error.message}`);
   }
 }
 

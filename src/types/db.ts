@@ -35,6 +35,8 @@ export type EventoRow = {
   palette: Json | null;
   max_companions: number;
   timezone: string;
+  /** Posicao do filete onde o endereco e escrito na arte. */
+  link_na_arte: Json | null;
   updated_at: string;
 };
 

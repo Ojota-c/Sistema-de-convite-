@@ -242,6 +242,18 @@ export const paletaSchema = z.object({
   borda: z.string().regex(COR_HEXADECIMAL),
 });
 
+/** Posicao do filete onde o endereco e escrito na arte, em porcentagem. */
+export const linhaDoLinkSchema = z
+  .object({
+    y: z.coerce.number().min(0).max(100),
+    inicio: z.coerce.number().min(0).max(100),
+    fim: z.coerce.number().min(0).max(100),
+  })
+  .refine((v) => v.fim - v.inicio >= 10, {
+    error: 'A faixa precisa ter ao menos 10% da largura para caber o endereço.',
+    path: ['fim'],
+  });
+
 export const TIPOS_DE_IMAGEM = ['image/jpeg', 'image/png', 'image/webp'] as const;
 export const TAMANHO_MAXIMO_IMAGEM = 5 * 1024 * 1024;
 

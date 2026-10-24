@@ -2,6 +2,14 @@
 
 import { useEffect, useRef, useState } from 'react';
 
+import {
+  ErroAoMontarConvite,
+  baixarBlob,
+  montarConviteComLink,
+  nomeDoArquivoDoConvite,
+} from '@/lib/convite-com-link';
+import type { LinhaDoLink } from '@/lib/linha-do-link';
+
 type Copiado = 'link' | 'mensagem' | null;
 
 /**
@@ -42,6 +50,10 @@ export interface BotoesDeCompartilharProps {
   link: string;
   mensagem: string;
   linkWhatsApp: string;
+  /** Rota que serve a arte deste convidado, para montar a imagem com o link. */
+  urlDaArte: string | null;
+  /** Onde escrever o endereco dentro da arte. */
+  linhaDoLink: LinhaDoLink;
 }
 
 export function BotoesDeCompartilhar({
@@ -49,10 +61,40 @@ export function BotoesDeCompartilhar({
   link,
   mensagem,
   linkWhatsApp,
+  urlDaArte,
+  linhaDoLink,
 }: BotoesDeCompartilharProps) {
   const [copiado, setCopiado] = useState<Copiado>(null);
   const [falhou, setFalhou] = useState(false);
+  const [montando, setMontando] = useState(false);
+  const [erroDaArte, setErroDaArte] = useState<string | null>(null);
   const temporizador = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  /**
+   * Baixa a arte do convite com o endereco desta pessoa escrito no campo em
+   * branco. Serve para quem prefere mandar a foto junto com a mensagem.
+   *
+   * O endereco escrito na imagem nao e clicavel: num JPEG nao existe link.
+   * Quem toca para abrir a pagina usa o link da mensagem, que vai junto.
+   */
+  async function baixarArteComLink() {
+    if (!urlDaArte) return;
+
+    setErroDaArte(null);
+    setMontando(true);
+    try {
+      const { blob } = await montarConviteComLink(urlDaArte, link, linhaDoLink);
+      baixarBlob(blob, nomeDoArquivoDoConvite(nome));
+    } catch (falha) {
+      setErroDaArte(
+        falha instanceof ErroAoMontarConvite
+          ? falha.message
+          : 'Não conseguimos montar a imagem com o link.',
+      );
+    } finally {
+      setMontando(false);
+    }
+  }
 
   useEffect(() => {
     return () => {
@@ -91,6 +133,17 @@ export function BotoesDeCompartilhar({
         {copiado === 'mensagem' ? 'Copiado!' : 'Copiar mensagem'}
       </button>
 
+      {urlDaArte ? (
+        <button
+          type="button"
+          onClick={() => void baixarArteComLink()}
+          className="botao botao-contorno px-3 text-sm"
+          disabled={montando}
+        >
+          {montando ? 'Montando...' : 'Baixar convite'}
+        </button>
+      ) : null}
+
       <a
         href={linkWhatsApp}
         target="_blank"
@@ -111,6 +164,10 @@ export function BotoesDeCompartilhar({
 
       {falhou ? (
         <span className="text-xs text-[#8a4034]">Não deu para copiar aqui.</span>
+      ) : null}
+
+      {erroDaArte ? (
+        <span className="text-xs text-[#8a4034]">{erroDaArte}</span>
       ) : null}
     </div>
   );

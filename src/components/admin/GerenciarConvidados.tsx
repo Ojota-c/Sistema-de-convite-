@@ -11,6 +11,7 @@ import {
   removerConvidadoAction,
 } from '@/app/admin/acoes';
 import { normalizarBusca } from '@/lib/painel';
+import type { LinhaDoLink } from '@/lib/linha-do-link';
 import type { LinhaDeConvidado } from '@/lib/visao';
 import type { Variante } from '@/types/dominio';
 import { formatarTelefone } from '@/lib/whatsapp';
@@ -279,9 +280,11 @@ function DistribuirVariante({ variantes }: { variantes: Variante[] }) {
 function FichaDeConvidado({
   linha,
   variantes,
+  linhaDoLink,
 }: {
   linha: LinhaDeConvidado;
   variantes: Variante[];
+  linhaDoLink: LinhaDoLink;
 }) {
   const [editando, setEditando] = useState(false);
   const [confirmandoRemocao, setConfirmandoRemocao] = useState(false);
@@ -387,6 +390,8 @@ function FichaDeConvidado({
           link={linha.link}
           mensagem={linha.mensagem}
           linkWhatsApp={linha.linkWhatsApp}
+          urlDaArte={`/c/${linha.token}/imagem`}
+          linhaDoLink={linhaDoLink}
         />
       </div>
 
@@ -440,9 +445,11 @@ function FichaDeConvidado({
 export function GerenciarConvidados({
   linhas,
   variantes,
+  linhaDoLink,
 }: {
   linhas: LinhaDeConvidado[];
   variantes: Variante[];
+  linhaDoLink: LinhaDoLink;
 }) {
   const [busca, setBusca] = useState('');
 
@@ -519,7 +526,12 @@ export function GerenciarConvidados({
         ) : (
           <ul className="mt-4 space-y-3">
             {visiveis.map((linha) => (
-              <FichaDeConvidado key={linha.id} linha={linha} variantes={variantes} />
+              <FichaDeConvidado
+                key={linha.id}
+                linha={linha}
+                variantes={variantes}
+                linhaDoLink={linhaDoLink}
+              />
             ))}
           </ul>
         )}

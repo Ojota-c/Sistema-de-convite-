@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 
+import { dePorcentagem } from '@/lib/linha-do-link';
 import { lerPaleta } from '@/lib/paleta';
 import {
   TAMANHO_MAXIMO_IMAGEM,
@@ -11,6 +12,7 @@ import {
   edicaoConvidadoSchema,
   eventoSchema,
   idConvidadoSchema,
+  linhaDoLinkSchema,
   loteSchema,
   novoConvidadoSchema,
   paletaSchema,
@@ -29,6 +31,7 @@ import {
   removerImagemDoConvite,
   salvarEvento,
   salvarImagemDoConvite,
+  salvarLinhaDoLink,
 } from '@/server/evento';
 import { encerrarSessao, temSessao } from '@/server/sessao';
 import {
@@ -198,6 +201,39 @@ export async function removerImagemAction(
 
   atualizarPainel();
   return sucesso('Imagem removida.');
+}
+
+/**
+ * Grava onde o endereco deve ser escrito dentro da arte.
+ * O painel envia porcentagens, que sao mais faceis de ler e digitar; o banco
+ * guarda fracoes.
+ */
+export async function salvarLinhaDoLinkAction(
+  _anterior: EstadoDeFormulario,
+  formData: FormData,
+): Promise<EstadoDeFormulario> {
+  if (!(await temSessao())) return SEM_SESSAO;
+
+  const validacao = linhaDoLinkSchema.safeParse({
+    y: texto(formData, 'y'),
+    inicio: texto(formData, 'inicio'),
+    fim: texto(formData, 'fim'),
+  });
+
+  if (!validacao.success) return erro(primeiroErro(validacao.error));
+
+  try {
+    await salvarLinhaDoLink({
+      y: dePorcentagem(validacao.data.y),
+      inicio: dePorcentagem(validacao.data.inicio),
+      fim: dePorcentagem(validacao.data.fim),
+    });
+  } catch (falha) {
+    return erro(falha instanceof Error ? falha.message : 'Não foi possível salvar.');
+  }
+
+  atualizarPainel();
+  return sucesso('Posição do link salva.');
 }
 
 // ---------------------------------------------------------------------------

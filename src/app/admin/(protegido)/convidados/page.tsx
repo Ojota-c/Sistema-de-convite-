@@ -24,5 +24,11 @@ export default async function PaginaDeConvidados() {
   ]);
   const linhas = montarLinhas(convidados, evento, urlBase());
 
-  return <GerenciarConvidados linhas={linhas} variantes={variantes} />;
+  return (
+    <GerenciarConvidados
+      linhas={linhas}
+      variantes={variantes}
+      linhaDoLink={evento.linhaDoLink}
+    />
+  );
 }

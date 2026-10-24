@@ -6,6 +6,7 @@ import {
 } from '@/app/admin/acoes';
 import { EnvioDeArte } from '@/components/admin/EnvioDeArte';
 import { FormularioDoEvento } from '@/components/admin/FormularioDoEvento';
+import { PosicaoDoLink } from '@/components/admin/PosicaoDoLink';
 import { variantesSemArte } from '@/lib/arte';
 import { utcParaHoraLocal } from '@/lib/datas';
 import { textoDaDataDoEvento, textoDoLocalDoEvento } from '@/lib/visao';
@@ -113,6 +114,27 @@ export default async function PaginaDoConvite() {
             acaoSalvar={salvarImagemAction}
             acaoRemover={removerImagemAction}
             compacto
+          />
+        </div>
+      </section>
+
+      <section aria-labelledby="titulo-posicao">
+        <h2 id="titulo-posicao" className="titulo-secao">
+          Endereço escrito na arte
+        </h2>
+        <p className="mt-2 text-sm text-[var(--cor-tinta-suave)]">
+          Na aba Convidados, o botão <strong>Baixar convite</strong> gera uma
+          cópia da arte com o endereço da pessoa escrito no campo em branco.
+          Serve para mandar a foto junto com a mensagem, ou para imprimir. O
+          endereço escrito na imagem não é clicável; quem toca para abrir a
+          página usa o link da mensagem.
+        </p>
+
+        <div className="mt-5">
+          <PosicaoDoLink
+            linha={evento.linhaDoLink}
+            urlDaArte={primeiroToken ? `/c/${primeiroToken}/imagem` : null}
+            linkDeExemplo={exemploDeLink}
           />
         </div>
       </section>

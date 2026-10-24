@@ -1,3 +1,4 @@
+import type { LinhaDoLink } from '@/lib/linha-do-link';
 import type { Paleta } from '@/lib/paleta';
 
 /**
@@ -20,6 +21,8 @@ export interface Evento {
   paleta: Paleta;
   maxAcompanhantes: number;
   fuso: string;
+  /** Onde o endereco e escrito na arte, ao baixar o convite pelo painel. */
+  linhaDoLink: LinhaDoLink;
   atualizadoEm: Date;
 }
 

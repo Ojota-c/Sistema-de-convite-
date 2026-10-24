@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { acharVariante, contarPorVariante, resolverArte, variantesSemArte } from '@/lib/arte';
+import { LINHA_PADRAO } from '@/lib/linha-do-link';
 import { PALETA_PADRAO, montarPaleta } from '@/lib/paleta';
 import type { Evento, Variante } from '@/types/dominio';
 
@@ -22,6 +23,7 @@ const EVENTO: Evento = {
   paleta: PALETA_DO_EVENTO,
   maxAcompanhantes: 3,
   fuso: 'America/Sao_Paulo',
+  linhaDoLink: LINHA_PADRAO,
   atualizadoEm: new Date('2026-10-24T12:00:00.000Z'),
 };
 

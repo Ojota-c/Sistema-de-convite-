@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { LINHA_PADRAO } from '@/lib/linha-do-link';
 import { PALETA_PADRAO } from '@/lib/paleta';
 import {
   mensagemParaConvidado,
@@ -26,6 +27,7 @@ const EVENTO: Evento = {
   paleta: PALETA_PADRAO,
   maxAcompanhantes: 3,
   fuso: 'America/Sao_Paulo',
+  linhaDoLink: LINHA_PADRAO,
   atualizadoEm: new Date('2027-01-10T12:00:00.000Z'),
 };
 
