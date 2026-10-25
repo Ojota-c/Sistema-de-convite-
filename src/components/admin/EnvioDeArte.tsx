@@ -1,6 +1,14 @@
 'use client';
 
-import { useActionState, useEffect, useRef, useState, useTransition } from 'react';
+import {
+  useActionState,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useTransition,
+  type ReactNode,
+} from 'react';
 
 import {
   ErroDeImagem,
@@ -16,12 +24,32 @@ type Acao = (
   formData: FormData,
 ) => Promise<EstadoDeFormulario>;
 
+/**
+ * Uma action que lanca, por queda de internet ou recusa no caminho, derruba a
+ * pagina inteira. Aqui a falha vira um aviso no proprio bloco.
+ */
+function semDerrubarAPagina(acao: Acao): Acao {
+  return async (anterior, formData) => {
+    try {
+      return await acao(anterior, formData);
+    } catch {
+      return {
+        estado: 'erro',
+        mensagem: 'A arte não chegou ao servidor. Confira a internet e tente de novo.',
+      };
+    }
+  };
+}
+
 export interface EnvioDeArteProps {
   /** Titulo do bloco, por exemplo "Fraldas tamanho M". */
   rotulo: string;
   /** Linha de apoio abaixo do titulo. */
   ajuda?: string;
-  /** Rota que serve a arte ja salva, quando existe. */
+  /**
+   * Rota que serve a arte ja salva, com a versao na URL. A versao muda a cada
+   * envio, entao a arte nova aparece na hora, sem o navegador mostrar a velha.
+   */
   imagemAtual: string | null;
   /**
    * Se existe arte gravada no banco.
@@ -38,16 +66,19 @@ export interface EnvioDeArteProps {
   camposExtras?: Record<string, string>;
   /** Identificador unico, para os rotulos nao colidirem entre varios blocos. */
   id: string;
-  compacto?: boolean;
+  /** Botoes de envio, logo embaixo da arte. So aparecem com arte salva. */
+  envio?: ReactNode;
 }
 
 /**
  * Envio de uma arte do convite.
  *
- * Serve tanto para a imagem geral do evento quanto para cada variante: o que
- * muda e a Server Action recebida por propriedade e os campos fixos que vao
- * junto no formulario. As regras de redimensionamento, compressao e extracao
- * de paleta sao as mesmas nos dois casos, porque sao as mesmas do navegador.
+ * A arte salva assim que o arquivo e escolhido. Antes havia um botao "Salvar
+ * arte" separado, e escolher o arquivo sem aperta-lo deixava a imagem so na
+ * tela: ao sair da pagina ela sumia, e parecia que o sistema nao guardava.
+ *
+ * O preparo (redimensionar, comprimir, extrair as cores) acontece no
+ * navegador, antes do envio.
  */
 export function EnvioDeArte({
   rotulo,
@@ -59,14 +90,17 @@ export function EnvioDeArte({
   acaoRemover,
   camposExtras = {},
   id,
-  compacto = false,
+  envio,
 }: EnvioDeArteProps) {
-  const [resultado, enviar, enviando] = useActionState(acaoSalvar, FORMULARIO_OCIOSO);
-  const [remocao, remover, removendo] = useActionState(acaoRemover, FORMULARIO_OCIOSO);
+  const salvar = useMemo(() => semDerrubarAPagina(acaoSalvar), [acaoSalvar]);
+  const tirar = useMemo(() => semDerrubarAPagina(acaoRemover), [acaoRemover]);
+  const [resultado, enviar, enviando] = useActionState(salvar, FORMULARIO_OCIOSO);
+  const [remocao, remover, removendo] = useActionState(tirar, FORMULARIO_OCIOSO);
 
   const [processada, setProcessada] = useState<ImagemProcessada | null>(null);
   const [erroLocal, setErroLocal] = useState<string | null>(null);
   const [processando, setProcessando] = useState(false);
+  const [confirmandoRemocao, setConfirmandoRemocao] = useState(false);
   const [, iniciarEnvio] = useTransition();
 
   const campoDeArquivo = useRef<HTMLInputElement | null>(null);
@@ -78,28 +112,45 @@ export function EnvioDeArte({
     };
   }, [processada]);
 
-  // Ajuste durante o render, nao em efeito: setState dentro de efeito
-  // encadearia um render a mais sem necessidade.
+  // Salvou: a previa local sai e entra a arte servida pelo sistema, que agora
+  // tem endereco novo. Ajuste durante o render, nao em efeito.
   const [ultimoVisto, setUltimoVisto] = useState(resultado);
   if (resultado !== ultimoVisto) {
     setUltimoVisto(resultado);
     if (resultado.estado === 'sucesso') setProcessada(null);
   }
 
+  // O mesmo arquivo pode ser escolhido de novo depois de qualquer resposta.
   useEffect(() => {
-    if (resultado.estado === 'sucesso' && campoDeArquivo.current) {
+    if (resultado.estado !== 'ocioso' && campoDeArquivo.current) {
       campoDeArquivo.current.value = '';
     }
   }, [resultado]);
+
+  function enviarArte(imagem: ImagemProcessada) {
+    const dados = new FormData();
+    for (const [chave, valor] of Object.entries(camposExtras)) dados.set(chave, valor);
+
+    const extensao = imagem.tipo === 'image/webp' ? 'webp' : 'jpg';
+    dados.set('arquivo', imagem.blob, `convite.${extensao}`);
+    dados.set('largura', String(imagem.largura));
+    dados.set('altura', String(imagem.altura));
+    dados.set('paleta', JSON.stringify(imagem.paleta));
+
+    iniciarEnvio(() => enviar(dados));
+  }
 
   async function aoEscolher(evento: React.ChangeEvent<HTMLInputElement>) {
     const arquivo = evento.target.files?.[0];
     if (!arquivo) return;
 
     setErroLocal(null);
+    setConfirmandoRemocao(false);
     setProcessando(true);
     try {
-      setProcessada(await processarImagem(arquivo));
+      const imagem = await processarImagem(arquivo);
+      setProcessada(imagem);
+      enviarArte(imagem);
     } catch (falha) {
       setProcessada(null);
       setErroLocal(
@@ -107,38 +158,29 @@ export function EnvioDeArte({
           ? falha.message
           : 'Não conseguimos preparar essa imagem. Tente outra.',
       );
+      if (campoDeArquivo.current) campoDeArquivo.current.value = '';
     } finally {
       setProcessando(false);
     }
   }
 
-  function aoEnviar() {
-    if (!processada) return;
-
-    const dados = new FormData();
-    for (const [chave, valor] of Object.entries(camposExtras)) dados.set(chave, valor);
-
-    const extensao = processada.tipo === 'image/webp' ? 'webp' : 'jpg';
-    dados.set('arquivo', processada.blob, `convite.${extensao}`);
-    dados.set('largura', String(processada.largura));
-    dados.set('altura', String(processada.altura));
-    dados.set('paleta', JSON.stringify(processada.paleta));
-
-    iniciarEnvio(() => enviar(dados));
-  }
+  const ocupado = processando || enviando || removendo;
+  const falhouAoSalvar = processada !== null && resultado.estado === 'erro' && !enviando;
 
   const aviso =
     erroLocal !== null
       ? { ehErro: true, texto: erroLocal }
-      : resultado.estado === 'erro'
-        ? { ehErro: true, texto: resultado.mensagem }
-        : resultado.estado === 'sucesso'
-          ? { ehErro: false, texto: resultado.mensagem ?? 'Arte salva.' }
-          : remocao.estado === 'erro'
-            ? { ehErro: true, texto: remocao.mensagem }
-            : remocao.estado === 'sucesso'
-              ? { ehErro: false, texto: remocao.mensagem ?? 'Arte removida.' }
-              : null;
+      : processando || enviando
+        ? null
+        : resultado.estado === 'erro'
+          ? { ehErro: true, texto: resultado.mensagem }
+          : resultado.estado === 'sucesso'
+            ? { ehErro: false, texto: resultado.mensagem ?? 'Arte salva.' }
+            : remocao.estado === 'erro'
+              ? { ehErro: true, texto: remocao.mensagem }
+              : remocao.estado === 'sucesso'
+                ? { ehErro: false, texto: remocao.mensagem ?? 'Arte removida.' }
+                : null;
 
   const previa = processada?.previa ?? imagemAtual;
 
@@ -149,7 +191,7 @@ export function EnvioDeArte({
         <span
           className={`etiqueta ${temArte ? 'etiqueta-confirmado' : 'etiqueta-sem-resposta'}`}
         >
-          {temArte ? 'Arte enviada' : 'Falta a arte'}
+          {temArte ? 'Arte salva' : 'Falta a arte'}
         </span>
       </div>
 
@@ -158,16 +200,16 @@ export function EnvioDeArte({
       ) : null}
 
       {previa ? (
-        <figure className="mt-3 overflow-hidden rounded-sm border border-[var(--cor-borda)]">
+        <figure className="relative mt-3 overflow-hidden rounded-sm border border-[var(--cor-borda)]">
           {/* eslint-disable-next-line @next/next/no-img-element -- previa local em blob, ou rota propria sem otimizador */}
           <img
             src={previa}
             alt={processada ? `Prévia da arte escolhida para ${rotulo}` : textoAlternativo}
-            className={`block w-full object-contain ${compacto ? 'max-h-56' : ''}`}
+            className={`block max-h-72 w-full object-contain ${ocupado ? 'opacity-60' : ''}`}
           />
           {processada ? (
             <figcaption className="border-t border-[var(--cor-borda)] px-3 py-2 text-xs text-[var(--cor-tinta-suave)]">
-              Nova: {processada.largura}×{processada.altura},{' '}
+              {processada.largura}×{processada.altura},{' '}
               {formatarTamanho(processada.tamanhoFinal)}
               {processada.tamanhoFinal < processada.tamanhoOriginal
                 ? ` (era ${formatarTamanho(processada.tamanhoOriginal)})`
@@ -177,34 +219,18 @@ export function EnvioDeArte({
         </figure>
       ) : (
         <p className="mt-3 rounded-sm border border-dashed border-[var(--cor-borda)] px-4 py-6 text-center text-xs text-[var(--cor-tinta-suave)]">
-          Sem arte própria. Quem receber esta variante vê a imagem geral do
-          evento.
+          Nenhuma arte ainda. Escolha a imagem abaixo e ela é salva na hora.
         </p>
       )}
 
-      <div className="mt-3">
-        <label className="apenas-leitor-de-tela" htmlFor={`arquivo-${id}`}>
-          Arquivo da arte de {rotulo}
-        </label>
-        <input
-          ref={campoDeArquivo}
-          id={`arquivo-${id}`}
-          className="campo text-sm file:mr-3 file:rounded-sm file:border-0 file:bg-[var(--cor-destaque)] file:px-3 file:py-1.5 file:text-[var(--cor-tinta-do-destaque)]"
-          type="file"
-          accept={TIPOS_DE_IMAGEM.join(',')}
-          onChange={(evento) => void aoEscolher(evento)}
-          disabled={processando || enviando}
-        />
-      </div>
-
-      {processando ? (
-        <p className="pulsando mt-2 text-xs text-[var(--cor-tinta-suave)]">
-          Preparando a imagem...
-        </p>
-      ) : null}
+      {temArte && !processada && envio ? envio : null}
 
       <div aria-live="polite" aria-atomic="true">
-        {aviso ? (
+        {processando || enviando ? (
+          <p className="pulsando mt-3 text-xs text-[var(--cor-tinta-suave)]">
+            {processando ? 'Preparando a imagem...' : 'Salvando a arte...'}
+          </p>
+        ) : aviso ? (
           <p
             className={`surgindo mt-3 rounded-sm border px-3 py-2 text-xs ${
               aviso.ehErro
@@ -218,28 +244,67 @@ export function EnvioDeArte({
       </div>
 
       <div className="mt-3 flex flex-wrap gap-2">
-        <button
-          type="button"
-          className="botao botao-principal px-3 text-sm"
-          onClick={aoEnviar}
-          disabled={!processada || enviando || processando}
+        <label
+          htmlFor={`arquivo-${id}`}
+          className={`botao ${temArte ? 'botao-contorno' : 'botao-principal'} cursor-pointer px-3 text-sm ${
+            ocupado ? 'pointer-events-none opacity-60' : ''
+          }`}
         >
-          {enviando ? 'Enviando...' : 'Salvar arte'}
-        </button>
+          {temArte ? 'Trocar arte' : 'Escolher arte'}
+          <span className="apenas-leitor-de-tela"> de {rotulo}</span>
+        </label>
+        <input
+          ref={campoDeArquivo}
+          id={`arquivo-${id}`}
+          className="apenas-leitor-de-tela"
+          type="file"
+          accept={TIPOS_DE_IMAGEM.join(',')}
+          onChange={(evento) => void aoEscolher(evento)}
+          disabled={ocupado}
+        />
+
+        {falhouAoSalvar ? (
+          <button
+            type="button"
+            className="botao botao-contorno px-3 text-sm"
+            onClick={() => enviarArte(processada)}
+          >
+            Tentar de novo
+          </button>
+        ) : null}
 
         {temArte && !processada ? (
-          <form action={remover}>
-            {Object.entries(camposExtras).map(([chave, valor]) => (
-              <input key={chave} type="hidden" name={chave} value={valor} />
-            ))}
+          confirmandoRemocao ? (
+            <form action={remover} className="flex flex-wrap gap-2">
+              {Object.entries(camposExtras).map(([chave, valor]) => (
+                <input key={chave} type="hidden" name={chave} value={valor} />
+              ))}
+              <button
+                type="submit"
+                className="botao botao-contorno px-3 text-sm text-[#8a4034]"
+                disabled={removendo}
+              >
+                {removendo ? 'Removendo...' : 'Sim, remover'}
+              </button>
+              <button
+                type="button"
+                className="botao-texto px-2 text-sm"
+                onClick={() => setConfirmandoRemocao(false)}
+                disabled={removendo}
+              >
+                Cancelar
+              </button>
+            </form>
+          ) : (
             <button
-              type="submit"
-              className="botao botao-contorno px-3 text-sm"
-              disabled={removendo}
+              type="button"
+              className="botao-texto px-2 text-sm"
+              onClick={() => setConfirmandoRemocao(true)}
+              disabled={ocupado}
             >
-              {removendo ? 'Removendo...' : 'Remover'}
+              Remover
             </button>
-          </form>
+          )
         ) : null}
       </div>
     </div>

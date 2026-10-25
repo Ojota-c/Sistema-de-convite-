@@ -3,7 +3,7 @@ import { headers } from 'next/headers';
 import { notFound } from 'next/navigation';
 import type { CSSProperties } from 'react';
 
-import { acharVariante, resolverArte } from '@/lib/arte';
+import { acharVariante, resolverArte, versaoDaArte } from '@/lib/arte';
 import { detectarSistema } from '@/lib/bots';
 import { descricaoDoEvento, linkGoogleAgenda, localCompleto } from '@/lib/calendario';
 import {
@@ -21,6 +21,8 @@ import { urlBase } from '@/server/ambiente';
 import { buscarConvidadoPorToken } from '@/server/convidados';
 import { buscarEvento } from '@/server/evento';
 import { listarVariantes } from '@/server/variantes';
+
+import { responderConvite } from './acoes';
 
 /**
  * A pagina do convidado.
@@ -82,7 +84,7 @@ export async function generateMetadata({ params }: PropsDaPagina): Promise<Metad
       images: arte.caminho
         ? [
             {
-              url: `${base}/c/${token}/imagem`,
+              url: `${base}/c/${token}/imagem?v=${versaoDaArte(arte.caminho)}`,
               width: arte.largura ?? 1200,
               height: arte.altura ?? 630,
               alt: `Convite do evento ${evento.titulo}`,
@@ -164,7 +166,9 @@ export default async function PaginaDoConvite({ params }: PropsDaPagina) {
         <div className="entrada entrada-1">
           <CartaoDoConvite
             evento={evento}
-            caminhoDaImagem={arte.caminho ? `/c/${token}/imagem` : null}
+            caminhoDaImagem={
+              arte.caminho ? `/c/${token}/imagem?v=${versaoDaArte(arte.caminho)}` : null
+            }
             larguraDaImagem={arte.largura}
             alturaDaImagem={arte.altura}
             sugestaoDePresente={arte.descricao}
@@ -175,7 +179,8 @@ export default async function PaginaDoConvite({ params }: PropsDaPagina) {
 
         <div className="cartao-convite entrada entrada-3 mt-6 px-6 py-9 sm:px-10">
           <RespostaDoConvidado
-            token={token}
+            acao={responderConvite}
+            camposOcultos={{ token }}
             nomeInicial={convidado.nome}
             acompanhantesIniciais={convidado.acompanhantes.map((a) => a.nome)}
             maxAcompanhantes={evento.maxAcompanhantes}

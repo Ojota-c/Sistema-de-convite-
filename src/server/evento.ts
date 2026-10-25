@@ -3,8 +3,8 @@ import 'server-only';
 import { cache } from 'react';
 
 import { horaLocalParaUtc, paraData } from '@/lib/datas';
-import { lerLinhaDoLink, type LinhaDoLink } from '@/lib/linha-do-link';
-import { lerPaleta, type Paleta } from '@/lib/paleta';
+import { lerLinhaDoLink } from '@/lib/linha-do-link';
+import { lerPaleta } from '@/lib/paleta';
 import type { DadosEvento } from '@/lib/validacao';
 import type { EventoRow } from '@/types/db';
 import type { Evento } from '@/types/dominio';
@@ -106,104 +106,6 @@ export async function salvarEvento(dados: DadosEvento): Promise<void> {
 
   if (error) {
     throw new Error(`Não foi possível salvar o evento: ${error.message}`);
-  }
-}
-
-/** Grava onde o endereco deve ser escrito dentro da arte. */
-export async function salvarLinhaDoLink(linha: LinhaDoLink): Promise<void> {
-  const { error } = await supabase()
-    .from('event')
-    .update({ link_na_arte: { ...linha } })
-    .eq('id', ID_DO_EVENTO);
-
-  if (error) {
-    throw new Error(`Não foi possível salvar a posição do link: ${error.message}`);
-  }
-}
-
-export interface ImagemParaSalvar {
-  bytes: ArrayBuffer;
-  tipo: string;
-  largura: number;
-  altura: number;
-  paleta: Paleta;
-}
-
-/**
- * Sobe a imagem do convite e grava a paleta extraida dela.
- *
- * O nome do arquivo carrega um sufixo de tempo, de modo que trocar a imagem
- * nunca sirva a versao antiga guardada em cache pela CDN ou pelo WhatsApp.
- */
-export async function salvarImagemDoConvite(imagem: ImagemParaSalvar): Promise<void> {
-  const cliente = supabase();
-  const anterior = await buscarEvento();
-
-  const extensao = imagem.tipo === 'image/png' ? 'png' : imagem.tipo === 'image/jpeg' ? 'jpg' : 'webp';
-  const caminho = `convite-${Date.now()}.${extensao}`;
-
-  const { error: erroDeUpload } = await cliente.storage
-    .from(balde())
-    .upload(caminho, imagem.bytes, {
-      contentType: imagem.tipo,
-      upsert: true,
-      cacheControl: '86400',
-    });
-
-  if (erroDeUpload) {
-    throw new Error(`Não foi possível enviar a imagem: ${erroDeUpload.message}`);
-  }
-
-  const { error: erroDeBanco } = await cliente
-    .from('event')
-    .update({
-      image_path: caminho,
-      image_mime: imagem.tipo,
-      image_width: imagem.largura,
-      image_height: imagem.altura,
-      palette: { ...imagem.paleta },
-    })
-    .eq('id', ID_DO_EVENTO);
-
-  if (erroDeBanco) {
-    // O banco nao aceitou, entao o arquivo recem-enviado vira lixo.
-    await cliente.storage.from(balde()).remove([caminho]);
-    throw new Error(`Não foi possível salvar a imagem: ${erroDeBanco.message}`);
-  }
-
-  // Com a nova imagem ja registrada, a antiga pode sair sem risco.
-  if (anterior.caminhoDaImagem && anterior.caminhoDaImagem !== caminho) {
-    const { error } = await cliente.storage
-      .from(balde())
-      .remove([anterior.caminhoDaImagem]);
-    if (error) {
-      console.error('[evento] imagem antiga não removida:', error.message);
-    }
-  }
-}
-
-/** Remove a imagem do convite e volta para a paleta padrao. */
-export async function removerImagemDoConvite(): Promise<void> {
-  const cliente = supabase();
-  const atual = await buscarEvento();
-
-  const { error } = await cliente
-    .from('event')
-    .update({
-      image_path: null,
-      image_mime: null,
-      image_width: null,
-      image_height: null,
-      palette: null,
-    })
-    .eq('id', ID_DO_EVENTO);
-
-  if (error) {
-    throw new Error(`Não foi possível remover a imagem: ${error.message}`);
-  }
-
-  if (atual.caminhoDaImagem) {
-    await cliente.storage.from(balde()).remove([atual.caminhoDaImagem]);
   }
 }
 

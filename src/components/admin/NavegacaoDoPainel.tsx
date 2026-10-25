@@ -6,9 +6,8 @@ import { usePathname } from 'next/navigation';
 import { sairAction } from '@/app/admin/acoes';
 
 const ABAS = [
-  { href: '/admin', rotulo: 'Acompanhamento' },
+  { href: '/admin', rotulo: 'Convidados' },
   { href: '/admin/convite', rotulo: 'Convite' },
-  { href: '/admin/convidados', rotulo: 'Convidados' },
 ] as const;
 
 export function NavegacaoDoPainel() {

@@ -5,6 +5,7 @@ import {
   aplicarModelo,
   formatarTelefone,
   linkDoConvite,
+  linkDoConviteAberto,
   linkWhatsApp,
 } from '@/lib/whatsapp';
 
@@ -19,7 +20,6 @@ const DADOS = {
 describe('aplicarModelo', () => {
   it('troca todos os marcadores', () => {
     const texto = aplicarModelo(MENSAGEM_PADRAO, DADOS);
-    expect(texto).toContain('Maria');
     expect(texto).toContain('Chá de Bebê do Antônio');
     expect(texto).toContain('https://exemplo.com/c/bcdfghjkmnpq');
     expect(texto).not.toContain('{');
@@ -51,6 +51,13 @@ describe('aplicarModelo', () => {
     expect(aplicarModelo('\n\n  Oi  \n\n', DADOS)).toBe('Oi');
   });
 
+  it('sem nome, some o marcador e a virgula antes dele', () => {
+    const { nome: _ignorado, ...semNome } = DADOS;
+    expect(aplicarModelo('Oi, {nome}! Vem?', semNome)).toBe('Oi! Vem?');
+    expect(aplicarModelo('Oi {nome}, vem?', { ...semNome, nome: '  ' })).toBe('Oi, vem?');
+    expect(aplicarModelo('{nome}\n{link}', semNome)).toBe(DADOS.link);
+  });
+
   it('devolve o modelo intacto quando nao ha marcador', () => {
     expect(aplicarModelo('Mensagem fixa.', DADOS)).toBe('Mensagem fixa.');
   });
@@ -64,9 +71,17 @@ describe('MENSAGEM_PADRAO', () => {
     }
   });
 
-  it('inclui o nome e o link', () => {
-    expect(MENSAGEM_PADRAO).toContain('{nome}');
+  it('inclui o link e não depende de nome, porque o link é o mesmo para todos', () => {
     expect(MENSAGEM_PADRAO).toContain('{link}');
+    expect(MENSAGEM_PADRAO).not.toContain('{nome}');
+  });
+});
+
+describe('linkDoConviteAberto', () => {
+  it('monta o link unico com o tamanho em minuscula', () => {
+    expect(linkDoConviteAberto('https://exemplo.com/', 'M')).toBe(
+      'https://exemplo.com/convite/m',
+    );
   });
 });
 

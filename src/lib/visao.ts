@@ -51,6 +51,16 @@ export function textoDoLocalDoEvento(evento: Evento): string {
   return localCompleto(evento.localNome, evento.localEndereco) ?? '';
 }
 
+/** Mensagem do link unico, a mesma para todo mundo. */
+export function mensagemDoLinkUnico(evento: Evento, link: string): string {
+  return aplicarModelo(evento.mensagemConvite ?? MENSAGEM_PADRAO, {
+    evento: evento.titulo,
+    data: textoDaDataDoEvento(evento),
+    local: textoDoLocalDoEvento(evento),
+    link,
+  });
+}
+
 /** Monta a mensagem personalizada de um convidado. */
 export function mensagemParaConvidado(
   evento: Evento,

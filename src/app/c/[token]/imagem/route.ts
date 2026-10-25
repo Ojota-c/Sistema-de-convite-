@@ -60,8 +60,10 @@ export async function GET(request: Request, { params }: Contexto) {
   // sempre que a imagem e trocada e serve bem como identidade da versao.
   const etag = `"${createHash('sha1').update(arte.caminho).digest('hex')}"`;
 
-  const cacheControl =
-    'public, max-age=600, s-maxage=86400, stale-while-revalidate=604800';
+  // Curto de proposito: este endereco nao muda quando a arte e trocada, e um
+  // cache longo continuava servindo a arte antiga por um dia inteiro. As
+  // paginas mandam ?v= com a versao, que ja contorna o cache do navegador.
+  const cacheControl = 'public, max-age=300, s-maxage=300';
 
   if (request.headers.get('if-none-match') === etag) {
     return new Response(null, {

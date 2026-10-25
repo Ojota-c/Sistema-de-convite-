@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { LINHA_PADRAO } from '@/lib/linha-do-link';
 import { PALETA_PADRAO } from '@/lib/paleta';
 import {
+  mensagemDoLinkUnico,
   mensagemParaConvidado,
   montarLinha,
   montarLinhas,
@@ -87,7 +88,6 @@ describe('mensagemParaConvidado', () => {
 
   it('usa o texto padrão quando não há mensagem salva', () => {
     const mensagem = mensagemParaConvidado(EVENTO, 'Ana Júlia', link);
-    expect(mensagem).toContain('Ana Júlia');
     expect(mensagem).toContain('Chá de Bebê do Antônio');
     expect(mensagem).toContain(link);
   });
@@ -106,7 +106,8 @@ describe('mensagemParaConvidado', () => {
   });
 
   it('não quebra com nome que tem cifrão', () => {
-    expect(mensagemParaConvidado(EVENTO, 'Ana $& Silva', link)).toContain(
+    const comNome = { ...EVENTO, mensagemConvite: 'Oi, {nome}! {link}' };
+    expect(mensagemParaConvidado(comNome, 'Ana $& Silva', link)).toContain(
       'Ana $& Silva',
     );
   });
@@ -215,5 +216,25 @@ describe('montarLinhas', () => {
 
   it('aguenta lista vazia', () => {
     expect(montarLinhas([], EVENTO, BASE)).toEqual([]);
+  });
+});
+
+describe('mensagemDoLinkUnico', () => {
+  const link = 'https://exemplo.com/convite/m';
+
+  it('leva o evento, a data, o local e o link', () => {
+    const mensagem = mensagemDoLinkUnico(EVENTO, link);
+    expect(mensagem).toContain('Chá de Bebê do Antônio');
+    expect(mensagem).toContain('14 de março de 2027');
+    expect(mensagem).toContain('Casa da Vó');
+    expect(mensagem).toContain(link);
+    expect(mensagem).not.toMatch(/\{[a-z]+\}/);
+  });
+
+  it('tira o {nome} de uma mensagem antiga sem deixar pontuação solta', () => {
+    const antiga = { ...EVENTO, mensagemConvite: 'Oi, {nome}! Vem no {evento}?\n{link}' };
+    expect(mensagemDoLinkUnico(antiga, link)).toBe(
+      `Oi! Vem no Chá de Bebê do Antônio?\n${link}`,
+    );
   });
 });

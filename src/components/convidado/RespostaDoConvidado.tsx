@@ -1,11 +1,36 @@
 'use client';
 
-import { useActionState, useEffect, useRef, useState } from 'react';
+import { useActionState, useEffect, useMemo, useRef, useState } from 'react';
 
-import { responderConvite } from '@/app/c/[token]/acoes';
-import { RESPOSTA_OCIOSA, type StatusConvidado } from '@/types/dominio';
+import {
+  RESPOSTA_OCIOSA,
+  type EstadoDaResposta,
+  type StatusConvidado,
+} from '@/types/dominio';
 
 import { Celebracao } from './Celebracao';
+
+type AcaoDeResposta = (
+  anterior: EstadoDaResposta,
+  formData: FormData,
+) => Promise<EstadoDaResposta>;
+
+/**
+ * No 4G a resposta pode nao chegar. Uma action que lanca derrubaria a pagina
+ * inteira; aqui a falha vira aviso e o formulario continua preenchido.
+ */
+function semDerrubarAPagina(acao: AcaoDeResposta): AcaoDeResposta {
+  return async (anterior, formData) => {
+    try {
+      return await acao(anterior, formData);
+    } catch {
+      return {
+        estado: 'erro',
+        mensagem: 'Sua resposta não chegou. Confira a internet e toque de novo.',
+      };
+    }
+  };
+}
 
 interface CampoDeAcompanhante {
   chave: number;
@@ -13,7 +38,15 @@ interface CampoDeAcompanhante {
 }
 
 export interface RespostaDoConvidadoProps {
-  token: string;
+  /** Server Action que grava a resposta. */
+  acao: AcaoDeResposta;
+  /** Campos fixos enviados junto, como o token ou o codigo da arte. */
+  camposOcultos: Record<string, string>;
+  /**
+   * Link unico: mostra "Responder por outra pessoa", para quem divide o
+   * celular nao sobrescrever a resposta de quem respondeu antes.
+   */
+  permitirOutraPessoa?: boolean;
   nomeInicial: string;
   acompanhantesIniciais: readonly string[];
   maxAcompanhantes: number;
@@ -30,7 +63,9 @@ export interface RespostaDoConvidadoProps {
  * vai, e um botao para mexer na lista de acompanhantes.
  */
 export function RespostaDoConvidado({
-  token,
+  acao,
+  camposOcultos,
+  permitirOutraPessoa = false,
   nomeInicial,
   acompanhantesIniciais,
   maxAcompanhantes,
@@ -38,12 +73,26 @@ export function RespostaDoConvidado({
   coresDaCelebracao,
   painelDeCalendario,
 }: RespostaDoConvidadoProps) {
-  const [resultado, enviar, enviando] = useActionState(
-    responderConvite,
-    RESPOSTA_OCIOSA,
-  );
+  const acaoProtegida = useMemo(() => semDerrubarAPagina(acao), [acao]);
+  const [resultado, enviar, enviando] = useActionState(acaoProtegida, RESPOSTA_OCIOSA);
 
   const [editando, setEditando] = useState(false);
+  // Controlado, para a tela de confirmacao mostrar o nome que acabou de ser
+  // digitado. No link unico a pessoa chega sem nome nenhum.
+  const [nome, setNome] = useState(nomeInicial);
+  // Proxima resposta cria uma pessoa nova em vez de atualizar a anterior.
+  const [outraPessoa, setOutraPessoa] = useState(false);
+
+  // Cada resposta gravada fecha o formulario e volta ao resumo. Ajuste
+  // durante o render, nao em efeito, para nao encadear um render a mais.
+  const [ultimoResultado, setUltimoResultado] = useState(resultado);
+  if (resultado !== ultimoResultado) {
+    setUltimoResultado(resultado);
+    if (resultado.estado === 'confirmado' || resultado.estado === 'recusado') {
+      setEditando(false);
+      setOutraPessoa(false);
+    }
+  }
   const [acompanhantes, setAcompanhantes] = useState<CampoDeAcompanhante[]>(() =>
     acompanhantesIniciais.map((nome, indice) => ({ chave: indice + 1, nome })),
   );
@@ -94,11 +143,32 @@ export function RespostaDoConvidado({
     setAcompanhantes((atuais) => atuais.filter((item) => item.chave !== chave));
   }
 
-  function alterarAcompanhante(chave: number, nome: string) {
+  function alterarAcompanhante(chave: number, novoNome: string) {
     setAcompanhantes((atuais) =>
-      atuais.map((item) => (item.chave === chave ? { ...item, nome } : item)),
+      atuais.map((item) => (item.chave === chave ? { ...item, nome: novoNome } : item)),
     );
   }
+
+  // O que estava na tela antes de "outra pessoa", para o Cancelar devolver.
+  const antesDeOutraPessoa = useRef<{ nome: string; acompanhantes: CampoDeAcompanhante[] } | null>(
+    null,
+  );
+
+  function responderPorOutraPessoa() {
+    antesDeOutraPessoa.current = { nome, acompanhantes };
+    setNome('');
+    setAcompanhantes([]);
+    setOutraPessoa(true);
+    setEditando(true);
+  }
+
+  const botaoOutraPessoa = permitirOutraPessoa ? (
+    <button type="button" className="botao-texto mt-3 block" onClick={responderPorOutraPessoa}>
+      Responder por outra pessoa
+    </button>
+  ) : null;
+
+  const nomeExibido = nome.trim() || nomeInicial;
 
   // ---------------------------------------------------------------- confirmado
   if (confirmado && !mostrarFormulario) {
@@ -123,7 +193,7 @@ export function RespostaDoConvidado({
           </p>
 
           <ul className="mt-5 space-y-1.5">
-            <li className="texto-destacado">{nomeInicial}</li>
+            <li className="texto-destacado">{nomeExibido}</li>
             {acompanhantesConfirmados.map((item) => (
               <li key={item.chave} className="texto-destacado">
                 {item.nome}
@@ -141,6 +211,7 @@ export function RespostaDoConvidado({
             >
               Mudar meu nome ou meus acompanhantes
             </button>
+            {botaoOutraPessoa}
           </div>
         </section>
       </>
@@ -161,7 +232,7 @@ export function RespostaDoConvidado({
         </h2>
 
         <p className="mt-4 text-[var(--cor-tinta-suave)]">
-          Obrigado por avisar, {nomeInicial}. Se mudar de ideia, é só voltar aqui.
+          Obrigado por avisar, {nomeExibido}. Se mudar de ideia, é só voltar aqui.
         </p>
 
         <div className="mt-8 border-t border-[var(--cor-borda)] pt-5">
@@ -172,13 +243,14 @@ export function RespostaDoConvidado({
           >
             Mudei de ideia, quero confirmar
           </button>
+          {botaoOutraPessoa}
         </div>
       </section>
     );
   }
 
   // ---------------------------------------------------------------- formulario
-  const jaRespondeu = confirmado || recusado;
+  const jaRespondeu = (confirmado || recusado) && !outraPessoa;
 
   return (
     <section className="entrada entrada-4" aria-labelledby="titulo-formulario">
@@ -191,7 +263,10 @@ export function RespostaDoConvidado({
       </h2>
 
       <form action={enviar} className="mt-6 space-y-6">
-        <input type="hidden" name="token" value={token} />
+        {Object.entries(camposOcultos).map(([chave, valor]) => (
+          <input key={chave} type="hidden" name={chave} value={valor} />
+        ))}
+        {outraPessoa ? <input type="hidden" name="novo" value="1" /> : null}
 
         <div>
           <label className="rotulo" htmlFor="campo-nome">
@@ -202,12 +277,17 @@ export function RespostaDoConvidado({
             className="campo"
             name="nome"
             type="text"
-            defaultValue={nomeInicial}
+            value={nome}
+            onChange={(evento) => setNome(evento.target.value)}
             maxLength={80}
             required
             autoComplete="name"
             enterKeyHint="next"
+            aria-describedby="ajuda-nome"
           />
+          <p id="ajuda-nome" className="mt-2 text-xs text-[var(--cor-tinta-suave)]">
+            Obrigatório, mesmo se você não puder ir: é assim que sabemos quem respondeu.
+          </p>
         </div>
 
         {maxAcompanhantes > 0 ? (
@@ -316,7 +396,14 @@ export function RespostaDoConvidado({
               <button
                 type="button"
                 className="botao-texto"
-                onClick={() => setEditando(false)}
+                onClick={() => {
+                  if (outraPessoa && antesDeOutraPessoa.current) {
+                    setNome(antesDeOutraPessoa.current.nome);
+                    setAcompanhantes(antesDeOutraPessoa.current.acompanhantes);
+                  }
+                  setOutraPessoa(false);
+                  setEditando(false);
+                }}
                 disabled={enviando}
               >
                 Cancelar

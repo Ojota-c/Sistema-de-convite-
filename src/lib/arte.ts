@@ -113,3 +113,39 @@ export function contarPorVariante(
 
   return linhas;
 }
+
+/**
+ * Arte do link unico.
+ *
+ * Com codigo, e a variante dele (null se o codigo nao existir, para a pagina
+ * responder 404 em vez de mostrar um tamanho errado). Sem codigo, como no
+ * endereco curto /convite, vale a primeira variante que ja tem arte.
+ */
+export function varianteDoLink(
+  variantes: readonly Variante[],
+  codigo: string | null,
+): Variante | null | undefined {
+  if (codigo) return acharVariante(variantes, codigo);
+  const ordenadas = variantes.slice().sort((a, b) => a.posicao - b.posicao);
+  return ordenadas.find((v) => v.temImagem) ?? ordenadas[0] ?? undefined;
+}
+
+/**
+ * Identidade curta de uma versao da arte, para ir no endereco da imagem.
+ *
+ * O caminho no Storage ja muda a cada envio, porque leva o instante do
+ * upload. Colocar um resumo dele na URL faz cada arte nova ter endereco novo,
+ * e assim nenhum cache, do navegador, da CDN ou do WhatsApp, devolve a antiga
+ * depois de uma troca. Era isso que fazia a arte recem-enviada parecer nao
+ * ter sido salva.
+ *
+ * FNV-1a de 32 bits: puro, sem node:crypto, e basta para distinguir versoes.
+ */
+export function versaoDaArte(caminho: string | null | undefined): string {
+  let hash = 0x811c9dc5;
+  for (const caractere of caminho ?? '') {
+    hash ^= caractere.codePointAt(0) ?? 0;
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  return hash.toString(36);
+}

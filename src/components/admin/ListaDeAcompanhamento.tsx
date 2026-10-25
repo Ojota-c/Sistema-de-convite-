@@ -1,22 +1,76 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useActionState, useMemo, useState } from 'react';
 
+import { removerConvidadoAction } from '@/app/admin/acoes';
 import { normalizarBusca } from '@/lib/painel';
 import type { LinhaDeConvidado } from '@/lib/visao';
-import { ROTULOS_DE_STATUS, type StatusConvidado } from '@/types/dominio';
+import { FORMULARIO_OCIOSO, ROTULOS_DE_STATUS, type StatusConvidado } from '@/types/dominio';
 
 import { EtiquetaDeStatus } from './EtiquetaDeStatus';
+
+/**
+ * Remove uma resposta, em dois toques: o primeiro so pergunta.
+ * Serve para limpar resposta repetida ou de teste.
+ */
+function RemoverResposta({ id, nome }: { id: string; nome: string }) {
+  const [resultado, remover, removendo] = useActionState(
+    removerConvidadoAction,
+    FORMULARIO_OCIOSO,
+  );
+  const [confirmando, setConfirmando] = useState(false);
+
+  if (!confirmando) {
+    return (
+      <button
+        type="button"
+        className="botao-texto text-xs"
+        onClick={() => setConfirmando(true)}
+      >
+        Remover<span className="apenas-leitor-de-tela"> a resposta de {nome}</span>
+      </button>
+    );
+  }
+
+  return (
+    <form action={remover} className="inline-flex flex-wrap items-center gap-2">
+      <input type="hidden" name="id" value={id} />
+      <button
+        type="submit"
+        className="botao-texto text-xs text-[#8a4034]"
+        disabled={removendo}
+      >
+        {removendo ? 'Removendo...' : 'Sim, remover'}
+      </button>
+      <button
+        type="button"
+        className="botao-texto text-xs"
+        onClick={() => setConfirmando(false)}
+        disabled={removendo}
+      >
+        Cancelar
+      </button>
+      {resultado.estado === 'erro' ? (
+        <span className="text-xs text-[#8a4034]">{resultado.mensagem}</span>
+      ) : null}
+    </form>
+  );
+}
 
 type FiltroDeStatus = StatusConvidado | 'todos';
 
 const FILTROS: { valor: FiltroDeStatus; rotulo: string }[] = [
   { valor: 'todos', rotulo: 'Todos' },
   { valor: 'confirmado', rotulo: ROTULOS_DE_STATUS.confirmado },
+  { valor: 'recusado', rotulo: ROTULOS_DE_STATUS.recusado },
+  // So aparecem se houver alguem assim, o que no link unico nao acontece:
+  // sobraram dos convites pessoais de antes.
   { valor: 'sem-resposta', rotulo: ROTULOS_DE_STATUS['sem-resposta'] },
   { valor: 'nao-abriu', rotulo: ROTULOS_DE_STATUS['nao-abriu'] },
-  { valor: 'recusado', rotulo: ROTULOS_DE_STATUS.recusado },
 ];
+
+/** Os dois primeiros filtros aparecem sempre; os de antes, so com alguem neles. */
+const FILTROS_FIXOS = new Set<FiltroDeStatus>(['todos', 'confirmado', 'recusado']);
 
 export function ListaDeAcompanhamento({ linhas }: { linhas: LinhaDeConvidado[] }) {
   const [status, setStatus] = useState<FiltroDeStatus>('todos');
@@ -45,7 +99,7 @@ export function ListaDeAcompanhamento({ linhas }: { linhas: LinhaDeConvidado[] }
     <section aria-labelledby="titulo-lista">
       <div className="flex flex-wrap items-baseline justify-between gap-3">
         <h2 id="titulo-lista" className="titulo-secao">
-          Quem foi convidado
+          Quem respondeu
         </h2>
         <a href="/admin/exportar" className="botao-texto text-sm">
           Exportar CSV
@@ -76,6 +130,7 @@ export function ListaDeAcompanhamento({ linhas }: { linhas: LinhaDeConvidado[] }
           {FILTROS.map((filtro) => {
             const ativo = status === filtro.valor;
             const total = contagens.get(filtro.valor) ?? 0;
+            if (!FILTROS_FIXOS.has(filtro.valor) && total === 0 && !ativo) return null;
 
             return (
               <button
@@ -98,7 +153,7 @@ export function ListaDeAcompanhamento({ linhas }: { linhas: LinhaDeConvidado[] }
       </div>
 
       <p className="apenas-leitor-de-tela" aria-live="polite">
-        {visiveis.length} de {linhas.length} convidados exibidos.
+        {visiveis.length} de {linhas.length} respostas exibidas.
       </p>
 
       {visiveis.length === 0 ? (
@@ -122,14 +177,18 @@ export function ListaDeAcompanhamento({ linhas }: { linhas: LinhaDeConvidado[] }
 
                 <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm text-[var(--cor-tinta-suave)]">
                   <div>
-                    <dt className="inline">Abriu: </dt>
-                    <dd className="inline">{linha.primeiraAberturaTexto ?? '—'}</dd>
+                    <dt className="inline">Fralda: </dt>
+                    <dd className="inline">{linha.variante || '—'}</dd>
                   </div>
                   <div>
                     <dt className="inline">Respondeu: </dt>
                     <dd className="inline">{linha.respostaTexto ?? '—'}</dd>
                   </div>
                 </dl>
+
+                <div className="mt-3 border-t border-[var(--cor-borda)] pt-2">
+                  <RemoverResposta id={linha.id} nome={linha.nome} />
+                </div>
               </li>
             ))}
           </ul>
@@ -139,11 +198,14 @@ export function ListaDeAcompanhamento({ linhas }: { linhas: LinhaDeConvidado[] }
             <table className="painel-tabela">
               <thead>
                 <tr>
-                  <th scope="col">Convidado</th>
-                  <th scope="col">Status</th>
+                  <th scope="col">Nome</th>
+                  <th scope="col">Resposta</th>
                   <th scope="col">Acompanhantes</th>
-                  <th scope="col">Abriu</th>
+                  <th scope="col">Fralda</th>
                   <th scope="col">Respondeu</th>
+                  <th scope="col">
+                    <span className="apenas-leitor-de-tela">Ações</span>
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -151,11 +213,6 @@ export function ListaDeAcompanhamento({ linhas }: { linhas: LinhaDeConvidado[] }
                   <tr key={linha.id}>
                     <td>
                       <span className="font-medium">{linha.nome}</span>
-                      {linha.totalDeAberturas > 1 ? (
-                        <span className="ml-2 text-xs text-[var(--cor-tinta-suave)]">
-                          {linha.totalDeAberturas} aberturas
-                        </span>
-                      ) : null}
                     </td>
                     <td>
                       <EtiquetaDeStatus status={linha.status} />
@@ -166,10 +223,13 @@ export function ListaDeAcompanhamento({ linhas }: { linhas: LinhaDeConvidado[] }
                         : '—'}
                     </td>
                     <td className="text-sm whitespace-nowrap text-[var(--cor-tinta-suave)]">
-                      {linha.primeiraAberturaTexto ?? '—'}
+                      {linha.variante || '—'}
                     </td>
                     <td className="text-sm whitespace-nowrap text-[var(--cor-tinta-suave)]">
                       {linha.respostaTexto ?? '—'}
+                    </td>
+                    <td className="text-right whitespace-nowrap">
+                      <RemoverResposta id={linha.id} nome={linha.nome} />
                     </td>
                   </tr>
                 ))}
@@ -198,9 +258,10 @@ function ListaVazia({ temConvidados }: { temConvidados: boolean }) {
         </>
       ) : (
         <>
-          <p className="titulo-secao text-[1.1rem]">Ainda não há convidados</p>
+          <p className="titulo-secao text-[1.1rem]">Ninguém respondeu ainda</p>
           <p className="mt-2 text-sm text-[var(--cor-tinta-suave)]">
-            Comece pela aba Convidados: dá para colar uma lista inteira de uma vez.
+            Mande o convite pela aba Convite. Cada pessoa que responder
+            aparece aqui sozinha.
           </p>
         </>
       )}

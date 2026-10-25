@@ -32,7 +32,6 @@ export function FormularioDoEvento(props: FormularioDoEventoProps) {
   const [mensagem, setMensagem] = useState(props.mensagemConvite || MENSAGEM_PADRAO);
 
   const previa = aplicarModelo(mensagem, {
-    nome: 'Ana Júlia',
     evento: titulo || 'Chá de Bebê',
     data: props.dataPorExtenso,
     local: props.localCompleto,
@@ -172,7 +171,8 @@ export function FormularioDoEvento(props: FormularioDoEventoProps) {
 
         <p id="ajuda-marcadores" className="mt-2 text-xs text-[var(--cor-tinta-suave)]">
           Use os marcadores {MARCADORES.join(', ')}. Eles são trocados pelos
-          dados de cada convidado na hora de enviar.
+          dados da festa e pelo link na hora de enviar. A mensagem é a mesma
+          para todo mundo.
         </p>
 
         <div className="mt-4">

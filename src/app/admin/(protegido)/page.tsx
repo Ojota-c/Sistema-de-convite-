@@ -11,7 +11,9 @@ import { listarVariantes } from '@/server/variantes';
 export const dynamic = 'force-dynamic';
 
 /**
- * Acompanhamento: os numeros no topo e a lista completa logo abaixo.
+ * Aba Convidados: os numeros no topo e a lista de quem respondeu logo abaixo.
+ * Ninguem e cadastrado a mao: cada pessoa que responde pelo link entra aqui
+ * sozinha, confirmando ou avisando que nao vai.
  */
 export default async function PaginaDeAcompanhamento() {
   await exigirAdmin();
@@ -23,19 +25,19 @@ export default async function PaginaDeAcompanhamento() {
   ]);
   const resumo = resumir(convidados);
   const linhas = montarLinhas(convidados, evento, urlBase());
-  const porVariante = contarPorVariante(convidados, variantes);
+  // Fralda vem de quem vai: so contam as respostas confirmadas.
+  const confirmados = convidados.filter((c) => c.status === 'confirmado');
+  const porVariante = contarPorVariante(confirmados, variantes);
 
   const cartoes = [
-    { rotulo: 'Convidados', valor: resumo.cadastrados, nota: 'cadastrados' },
-    { rotulo: 'Abriram', valor: resumo.abriram, nota: `de ${resumo.cadastrados}` },
-    { rotulo: 'Confirmaram', valor: resumo.confirmados, nota: 'convites' },
     {
       rotulo: 'Pessoas',
       valor: resumo.pessoasConfirmadas,
-      nota: 'com acompanhantes',
+      nota: 'confirmadas, com acompanhantes',
       destaque: true,
     },
-    { rotulo: 'Não abriram', valor: resumo.naoAbriram, nota: 'ainda' },
+    { rotulo: 'Confirmaram', valor: resumo.confirmados, nota: 'respostas' },
+    { rotulo: 'Não vão', valor: resumo.recusaram, nota: 'avisaram' },
   ];
 
   return (
@@ -45,7 +47,7 @@ export default async function PaginaDeAcompanhamento() {
           Como está a festa
         </h1>
 
-        <dl className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+        <dl className="mt-5 grid grid-cols-3 gap-3">
           {cartoes.map((cartao) => (
             <div
               key={cartao.rotulo}
@@ -60,23 +62,16 @@ export default async function PaginaDeAcompanhamento() {
           ))}
         </dl>
 
-        {resumo.recusaram > 0 ? (
-          <p className="mt-3 text-sm text-[var(--cor-tinta-suave)]">
-            {resumo.recusaram === 1
-              ? '1 pessoa avisou que não vai poder ir.'
-              : `${resumo.recusaram} pessoas avisaram que não vão poder ir.`}
-          </p>
-        ) : null}
       </section>
 
-      {porVariante.length > 0 && convidados.length > 0 ? (
+      {porVariante.length > 0 && confirmados.length > 0 ? (
         <section aria-labelledby="titulo-variantes">
           <h2 id="titulo-variantes" className="titulo-secao">
             Fraldas por tamanho
           </h2>
           <p className="mt-2 text-sm text-[var(--cor-tinta-suave)]">
-            Quantas pessoas receberam cada arte. Serve para estimar quanto vai
-            chegar de cada tamanho.
+            Quantas confirmações chegaram por cada arte. Serve para estimar
+            quanto vai chegar de cada tamanho.
           </p>
 
           <dl className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -92,7 +87,7 @@ export default async function PaginaDeAcompanhamento() {
                 <dt className="sobretitulo text-[0.68rem]">{linha.descricao}</dt>
                 <dd className="painel-numero mt-2">{linha.total}</dd>
                 <p className="mt-1 text-xs text-[var(--cor-tinta-suave)]">
-                  {linha.total === 1 ? 'convidado' : 'convidados'}
+                  {linha.total === 1 ? 'confirmação' : 'confirmações'}
                 </p>
               </div>
             ))}

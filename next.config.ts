@@ -19,6 +19,15 @@ const cabecalhosDeSeguranca = [
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
+  experimental: {
+    serverActions: {
+      // O padrao e 1 MB. A arte costuma chegar bem menor, ja comprimida no
+      // navegador, mas uma arte grande que nao encolhesse o bastante era
+      // recusada antes de chegar a action, sem mensagem nenhuma na tela.
+      // Folga acima dos 5 MB que o servidor aceita, para o envelope do form.
+      bodySizeLimit: '6mb',
+    },
+  },
   async headers() {
     return [
       {

@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
-import { acharVariante, contarPorVariante, resolverArte, variantesSemArte } from '@/lib/arte';
+import {
+  acharVariante,
+  contarPorVariante,
+  resolverArte,
+  varianteDoLink,
+  variantesSemArte,
+  versaoDaArte,
+} from '@/lib/arte';
 import { LINHA_PADRAO } from '@/lib/linha-do-link';
 import { PALETA_PADRAO, montarPaleta } from '@/lib/paleta';
 import type { Evento, Variante } from '@/types/dominio';
@@ -205,5 +212,45 @@ describe('contarPorVariante', () => {
 
   it('aguenta lista vazia de convidados', () => {
     expect(contarPorVariante([], variantes).every((l) => l.total === 0)).toBe(true);
+  });
+});
+
+describe('varianteDoLink', () => {
+  const P = variante({ codigo: 'P', posicao: 0 });
+  const LISTA = [SEM_ARTE, COM_ARTE, P];
+
+  it('acha o tamanho pedido no link, sem diferenciar maiúscula', () => {
+    expect(varianteDoLink(LISTA, 'm')?.codigo).toBe('M');
+  });
+
+  it('devolve null para um tamanho que não existe, para a página dar 404', () => {
+    expect(varianteDoLink(LISTA, 'XG')).toBeNull();
+  });
+
+  it('sem tamanho, usa a primeira arte pronta na ordem de exibição', () => {
+    expect(varianteDoLink(LISTA, null)?.codigo).toBe('M');
+  });
+
+  it('sem nenhuma arte pronta, usa a primeira da ordem', () => {
+    expect(varianteDoLink([SEM_ARTE, P], null)?.codigo).toBe('P');
+  });
+
+  it('sem variantes, devolve undefined e a página usa a imagem do evento', () => {
+    expect(varianteDoLink([], null)).toBeUndefined();
+  });
+});
+
+describe('versaoDaArte', () => {
+  it('muda quando a arte muda, para nenhum cache servir a antiga', () => {
+    expect(versaoDaArte('variante-m-1.jpg')).not.toBe(versaoDaArte('variante-m-2.jpg'));
+  });
+
+  it('é estável para a mesma arte', () => {
+    expect(versaoDaArte('variante-m-1.jpg')).toBe(versaoDaArte('variante-m-1.jpg'));
+  });
+
+  it('só usa caracteres seguros para URL', () => {
+    expect(versaoDaArte('variante-m-1792885782441.jpg')).toMatch(/^[0-9a-z]+$/);
+    expect(versaoDaArte(null)).toMatch(/^[0-9a-z]+$/);
   });
 });

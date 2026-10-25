@@ -3,36 +3,19 @@
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 
-import { dePorcentagem } from '@/lib/linha-do-link';
 import { lerPaleta } from '@/lib/paleta';
 import {
   TAMANHO_MAXIMO_IMAGEM,
   TIPOS_DE_IMAGEM,
   codigoDeVarianteSchema,
-  edicaoConvidadoSchema,
   eventoSchema,
   idConvidadoSchema,
-  linhaDoLinkSchema,
-  loteSchema,
-  novoConvidadoSchema,
   paletaSchema,
   primeiroErro,
 } from '@/lib/validacao';
 import type { EstadoDeFormulario } from '@/types/dominio';
-import {
-  atualizarConvidado,
-  criarConvidado,
-  criarConvidadosEmLote,
-  definirVariante,
-  definirVarianteDosSemVariante,
-  removerConvidado,
-} from '@/server/convidados';
-import {
-  removerImagemDoConvite,
-  salvarEvento,
-  salvarImagemDoConvite,
-  salvarLinhaDoLink,
-} from '@/server/evento';
+import { removerConvidado } from '@/server/convidados';
+import { salvarEvento } from '@/server/evento';
 import { encerrarSessao, temSessao } from '@/server/sessao';
 import {
   removerImagemDaVariante,
@@ -69,17 +52,15 @@ function sucesso(mensagem?: string): EstadoDeFormulario {
 function atualizarPainel(): void {
   revalidatePath('/admin');
   revalidatePath('/admin/convite');
-  revalidatePath('/admin/convidados');
+  // A arte e os dados da festa aparecem tambem no link unico.
+  revalidatePath('/convite', 'layout');
+  revalidatePath('/');
 }
 
 // ---------------------------------------------------------------------------
 // Evento
 // ---------------------------------------------------------------------------
-/**
- * Le e confere os campos de uma imagem enviada pelo painel.
- * Compartilhado pela arte geral do evento e pelas artes das variantes, para
- * as duas aplicarem exatamente as mesmas regras.
- */
+/** Le e confere os campos de uma arte enviada pelo painel. */
 async function lerImagemDoFormulario(formData: FormData):
   Promise<
     | { ok: true; bytes: ArrayBuffer; tipo: string; largura: number; altura: number; paleta: ReturnType<typeof lerPaleta> }
@@ -126,7 +107,6 @@ async function lerImagemDoFormulario(formData: FormData):
   };
 }
 
-
 export async function salvarEventoAction(
   _anterior: EstadoDeFormulario,
   formData: FormData,
@@ -158,168 +138,9 @@ export async function salvarEventoAction(
   return sucesso('Convite salvo.');
 }
 
-export async function salvarImagemAction(
-  _anterior: EstadoDeFormulario,
-  formData: FormData,
-): Promise<EstadoDeFormulario> {
-  if (!(await temSessao())) return SEM_SESSAO;
-
-  const imagem = await lerImagemDoFormulario(formData);
-  if (!imagem.ok) return erro(imagem.mensagem);
-
-  try {
-    await salvarImagemDoConvite({
-      bytes: imagem.bytes,
-      tipo: imagem.tipo,
-      largura: imagem.largura,
-      altura: imagem.altura,
-      paleta: imagem.paleta,
-    });
-  } catch (falha) {
-    return erro(
-      falha instanceof Error ? falha.message : 'Não foi possível enviar a imagem.',
-    );
-  }
-
-  atualizarPainel();
-  return sucesso('Imagem do convite atualizada.');
-}
-
-export async function removerImagemAction(
-  _anterior: EstadoDeFormulario,
-  _formData: FormData,
-): Promise<EstadoDeFormulario> {
-  if (!(await temSessao())) return SEM_SESSAO;
-
-  try {
-    await removerImagemDoConvite();
-  } catch (falha) {
-    return erro(
-      falha instanceof Error ? falha.message : 'Não foi possível remover a imagem.',
-    );
-  }
-
-  atualizarPainel();
-  return sucesso('Imagem removida.');
-}
-
-/**
- * Grava onde o endereco deve ser escrito dentro da arte.
- * O painel envia porcentagens, que sao mais faceis de ler e digitar; o banco
- * guarda fracoes.
- */
-export async function salvarLinhaDoLinkAction(
-  _anterior: EstadoDeFormulario,
-  formData: FormData,
-): Promise<EstadoDeFormulario> {
-  if (!(await temSessao())) return SEM_SESSAO;
-
-  const validacao = linhaDoLinkSchema.safeParse({
-    y: texto(formData, 'y'),
-    inicio: texto(formData, 'inicio'),
-    fim: texto(formData, 'fim'),
-  });
-
-  if (!validacao.success) return erro(primeiroErro(validacao.error));
-
-  try {
-    await salvarLinhaDoLink({
-      y: dePorcentagem(validacao.data.y),
-      inicio: dePorcentagem(validacao.data.inicio),
-      fim: dePorcentagem(validacao.data.fim),
-    });
-  } catch (falha) {
-    return erro(falha instanceof Error ? falha.message : 'Não foi possível salvar.');
-  }
-
-  atualizarPainel();
-  return sucesso('Posição do link salva.');
-}
-
 // ---------------------------------------------------------------------------
 // Convidados
 // ---------------------------------------------------------------------------
-
-export async function adicionarConvidadoAction(
-  _anterior: EstadoDeFormulario,
-  formData: FormData,
-): Promise<EstadoDeFormulario> {
-  if (!(await temSessao())) return SEM_SESSAO;
-
-  const validacao = novoConvidadoSchema.safeParse({
-    nome: texto(formData, 'nome'),
-    telefone: texto(formData, 'telefone'),
-  });
-
-  if (!validacao.success) {
-    return erro(primeiroErro(validacao.error));
-  }
-
-  try {
-    await criarConvidado(validacao.data.nome, validacao.data.telefone);
-  } catch (falha) {
-    return erro(
-      falha instanceof Error ? falha.message : 'Não foi possível adicionar.',
-    );
-  }
-
-  atualizarPainel();
-  return sucesso(`${validacao.data.nome} entrou na lista.`);
-}
-
-export async function adicionarEmLoteAction(
-  _anterior: EstadoDeFormulario,
-  formData: FormData,
-): Promise<EstadoDeFormulario> {
-  if (!(await temSessao())) return SEM_SESSAO;
-
-  const validacao = loteSchema.safeParse(texto(formData, 'lista'));
-  if (!validacao.success) {
-    return erro(primeiroErro(validacao.error));
-  }
-
-  try {
-    const total = await criarConvidadosEmLote(validacao.data);
-    atualizarPainel();
-    return sucesso(
-      total === 1 ? '1 convidado adicionado.' : `${total} convidados adicionados.`,
-    );
-  } catch (falha) {
-    return erro(
-      falha instanceof Error ? falha.message : 'Não foi possível adicionar a lista.',
-    );
-  }
-}
-
-export async function editarConvidadoAction(
-  _anterior: EstadoDeFormulario,
-  formData: FormData,
-): Promise<EstadoDeFormulario> {
-  if (!(await temSessao())) return SEM_SESSAO;
-
-  const validacao = edicaoConvidadoSchema.safeParse({
-    id: texto(formData, 'id'),
-    nome: texto(formData, 'nome'),
-    telefone: texto(formData, 'telefone'),
-  });
-
-  if (!validacao.success) {
-    return erro(primeiroErro(validacao.error));
-  }
-
-  try {
-    await atualizarConvidado(
-      validacao.data.id,
-      validacao.data.nome,
-      validacao.data.telefone,
-    );
-  } catch (falha) {
-    return erro(falha instanceof Error ? falha.message : 'Não foi possível salvar.');
-  }
-
-  atualizarPainel();
-  return sucesso('Convidado atualizado.');
-}
 
 export async function removerConvidadoAction(
   _anterior: EstadoDeFormulario,
@@ -339,13 +160,12 @@ export async function removerConvidadoAction(
   }
 
   atualizarPainel();
-  return sucesso('Convidado removido.');
+  return sucesso('Resposta removida.');
 }
 
 // ---------------------------------------------------------------------------
 // Variantes do convite
 // ---------------------------------------------------------------------------
-
 
 export async function salvarArteDaVarianteAction(
   _anterior: EstadoDeFormulario,
@@ -372,7 +192,7 @@ export async function salvarArteDaVarianteAction(
   }
 
   atualizarPainel();
-  return sucesso(`Arte da variante ${codigo.data} atualizada.`);
+  return sucesso(`Arte ${codigo.data} salva.`);
 }
 
 export async function removerArteDaVarianteAction(
@@ -391,61 +211,7 @@ export async function removerArteDaVarianteAction(
   }
 
   atualizarPainel();
-  return sucesso(`Arte da variante ${codigo.data} removida.`);
-}
-
-/** Define qual arte um convidado recebe. Texto vazio limpa a escolha. */
-export async function definirVarianteAction(
-  _anterior: EstadoDeFormulario,
-  formData: FormData,
-): Promise<EstadoDeFormulario> {
-  if (!(await temSessao())) return SEM_SESSAO;
-
-  const id = idConvidadoSchema.safeParse({ id: texto(formData, 'id') });
-  if (!id.success) return erro(primeiroErro(id.error));
-
-  const bruto = texto(formData, 'codigo').trim();
-  let codigo: string | null = null;
-
-  if (bruto.length > 0) {
-    const validacao = codigoDeVarianteSchema.safeParse(bruto);
-    if (!validacao.success) return erro(primeiroErro(validacao.error));
-    codigo = validacao.data;
-  }
-
-  try {
-    await definirVariante(id.data.id, codigo);
-  } catch (falha) {
-    return erro(falha instanceof Error ? falha.message : 'Não foi possível salvar.');
-  }
-
-  atualizarPainel();
-  return sucesso(codigo ? `Tamanho ${codigo} definido.` : 'Tamanho removido.');
-}
-
-/** Atribui uma variante a todo mundo que ainda nao tem nenhuma. */
-export async function distribuirVarianteAction(
-  _anterior: EstadoDeFormulario,
-  formData: FormData,
-): Promise<EstadoDeFormulario> {
-  if (!(await temSessao())) return SEM_SESSAO;
-
-  const codigo = codigoDeVarianteSchema.safeParse(texto(formData, 'codigo'));
-  if (!codigo.success) return erro(primeiroErro(codigo.error));
-
-  try {
-    const total = await definirVarianteDosSemVariante(codigo.data);
-    atualizarPainel();
-    return sucesso(
-      total === 0
-        ? 'Todo mundo já tinha um tamanho definido.'
-        : total === 1
-          ? `1 convidado recebeu o tamanho ${codigo.data}.`
-          : `${total} convidados receberam o tamanho ${codigo.data}.`,
-    );
-  } catch (falha) {
-    return erro(falha instanceof Error ? falha.message : 'Não foi possível distribuir.');
-  }
+  return sucesso(`Arte ${codigo.data} removida.`);
 }
 
 // ---------------------------------------------------------------------------

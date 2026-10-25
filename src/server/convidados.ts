@@ -89,66 +89,47 @@ export const buscarConvidadoPorToken = cache(async function buscarConvidadoPorTo
 });
 
 /**
- * Cria um convidado com token proprio.
+ * Cria a linha de quem respondeu pelo link unico.
+ *
+ * Ninguem e cadastrado antes: a pessoa abre o link, digita o nome e a linha
+ * nasce aqui. O token continua existindo, porque e por ele que as funcoes de
+ * confirmar e recusar acham a linha, e e ele que fica no cookie para a pessoa
+ * poder voltar e mudar a resposta.
  *
  * O indice unico do token e a autoridade final. Na colisao, que e
  * astronomicamente improvavel com 80 bits, basta sortear outro.
  */
-export async function criarConvidado(
+export async function criarRespostaAberta(
   nome: string,
-  telefone: string | null,
-): Promise<Convidado> {
+  codigoDaVariante: string | null,
+): Promise<{ id: string; token: string }> {
   const cliente = supabase();
+  const agora = new Date().toISOString();
 
   for (let tentativa = 0; tentativa < 5; tentativa += 1) {
     const { data, error } = await cliente
       .from('guests')
-      .insert({ name: nome, phone: telefone, token: gerarToken() })
-      .select(COLUNAS_DO_CONVIDADO)
+      .insert({
+        name: nome,
+        token: gerarToken(),
+        variant_code: codigoDaVariante,
+        // Quem responde abriu o link, entao a abertura ja vale.
+        first_opened_at: agora,
+        last_opened_at: agora,
+        open_count: 1,
+      })
+      .select('id, token')
       .single();
 
-    if (!error && data) {
-      return paraDominio({ ...data, companions: [] });
-    }
+    if (!error && data) return data;
 
     // 23505 e violacao de unicidade; qualquer outro erro e real.
     if (error && error.code !== '23505') {
-      throw new Error(`Não foi possível criar o convidado: ${error.message}`);
+      throw new Error(`Não foi possível registrar a resposta: ${error.message}`);
     }
   }
 
-  throw new Error('Não foi possível gerar um token único para o convidado.');
-}
-
-/** Cria varios convidados de uma vez, a partir da lista colada no painel. */
-export async function criarConvidadosEmLote(nomes: readonly string[]): Promise<number> {
-  if (nomes.length === 0) return 0;
-
-  const { data, error } = await supabase()
-    .from('guests')
-    .insert(nomes.map((nome) => ({ name: nome, phone: null, token: gerarToken() })))
-    .select('id');
-
-  if (error) {
-    throw new Error(`Não foi possível adicionar a lista: ${error.message}`);
-  }
-
-  return data?.length ?? 0;
-}
-
-export async function atualizarConvidado(
-  id: string,
-  nome: string,
-  telefone: string | null,
-): Promise<void> {
-  const { error } = await supabase()
-    .from('guests')
-    .update({ name: nome, phone: telefone })
-    .eq('id', id);
-
-  if (error) {
-    throw new Error(`Não foi possível salvar o convidado: ${error.message}`);
-  }
+  throw new Error('Não foi possível gerar um token único para a resposta.');
 }
 
 /** Remove o convidado. Os acompanhantes saem junto, por cascata. */
@@ -158,40 +139,6 @@ export async function removerConvidado(id: string): Promise<void> {
   if (error) {
     throw new Error(`Não foi possível remover o convidado: ${error.message}`);
   }
-}
-
-/** Define qual arte do convite um convidado recebe. */
-export async function definirVariante(
-  id: string,
-  codigo: string | null,
-): Promise<void> {
-  const { error } = await supabase()
-    .from('guests')
-    .update({ variant_code: codigo })
-    .eq('id', id);
-
-  if (error) {
-    throw new Error(`Não foi possível definir a variante: ${error.message}`);
-  }
-}
-
-/**
- * Distribui uma variante para todos os convidados que ainda nao tem nenhuma.
- * Serve para o organizador nao precisar clicar pessoa por pessoa quando a
- * maioria vai receber o mesmo tamanho.
- */
-export async function definirVarianteDosSemVariante(codigo: string): Promise<number> {
-  const { data, error } = await supabase()
-    .from('guests')
-    .update({ variant_code: codigo })
-    .is('variant_code', null)
-    .select('id');
-
-  if (error) {
-    throw new Error(`Não foi possível distribuir a variante: ${error.message}`);
-  }
-
-  return data?.length ?? 0;
 }
 
 /** Interpreta a resposta jsonb das funcoes do Postgres. */

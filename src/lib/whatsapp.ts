@@ -6,10 +6,18 @@
  * parentese ou cifrao nao quebre nada.
  */
 
-export const MARCADORES = ['{nome}', '{evento}', '{data}', '{local}', '{link}'] as const;
+/**
+ * Marcadores oferecidos no painel.
+ *
+ * O link agora e o mesmo para todo mundo, entao nao existe mais um nome de
+ * convidado para pôr na mensagem. O {nome} continua sendo entendido, porque
+ * uma mensagem antiga pode te-lo, mas sai vazio e leva junto a virgula ou o
+ * espaco que o antecedia: "Oi, {nome}!" vira "Oi!".
+ */
+export const MARCADORES = ['{evento}', '{data}', '{local}', '{link}'] as const;
 
 export const MENSAGEM_PADRAO = [
-  'Oi, {nome}! Tem uma festinha chegando e você faz falta nela.',
+  'Oi! Tem uma festinha chegando e você faz falta nela.',
   '',
   '{evento}',
   '{data}',
@@ -20,7 +28,8 @@ export const MENSAGEM_PADRAO = [
 ].join('\n');
 
 export interface DadosDoModelo {
-  nome: string;
+  /** Vazio no link unico: o marcador some junto com a pontuacao antes dele. */
+  nome?: string;
   evento: string;
   data: string;
   local: string;
@@ -38,15 +47,19 @@ export interface DadosDoModelo {
  * seja expandido de novo.
  */
 export function aplicarModelo(modelo: string, dados: DadosDoModelo): string {
+  const nome = dados.nome?.trim() ?? '';
   const valores: Record<string, string> = {
-    '{nome}': dados.nome,
+    '{nome}': nome,
     '{evento}': dados.evento,
     '{data}': dados.data,
     '{local}': dados.local,
     '{link}': dados.link,
   };
 
-  const texto = modelo.replace(
+  // Sem nome, "Oi, {nome}!" tem de virar "Oi!", e nao "Oi, !".
+  const semNome = nome.length > 0 ? modelo : modelo.replace(/[ \t]*,?[ \t]*\{nome\}/g, '');
+
+  const texto = semNome.replace(
     /\{(?:nome|evento|data|local|link)\}/g,
     (marcador) => valores[marcador] ?? marcador,
   );
@@ -60,7 +73,18 @@ export function aplicarModelo(modelo: string, dados: DadosDoModelo): string {
     .trim();
 }
 
-/** URL publica e personalizada de um convidado. */
+/**
+ * Link unico do convite, o mesmo para todos.
+ *
+ * O codigo da arte vai no caminho so para a previa do WhatsApp mostrar a
+ * imagem escolhida por quem enviou. A pagina e a mesma em qualquer tamanho.
+ */
+export function linkDoConviteAberto(urlBase: string, codigo: string): string {
+  const base = urlBase.trim().replace(/\/+$/, '');
+  return `${base}/convite/${encodeURIComponent(codigo.trim().toLowerCase())}`;
+}
+
+/** URL antiga, pessoal, de quem foi cadastrado antes do link unico. */
 export function linkDoConvite(urlBase: string, token: string): string {
   const base = urlBase.trim().replace(/\/+$/, '');
   return `${base}/c/${token}`;

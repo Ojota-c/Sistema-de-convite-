@@ -55,9 +55,11 @@ export async function GET(request: Request, { params }: Contexto) {
   if (!caminho) return naoEncontrado();
 
   const etag = `"${createHash('sha1').update(caminho).digest('hex')}"`;
-  // Cache so no navegador do organizador, nunca em CDN compartilhada: a
-  // resposta depende da sessao dele.
-  const cacheControl = 'private, max-age=300';
+  // Cache so no navegador do organizador, nunca em CDN compartilhada, porque a
+  // resposta depende da sessao dele. E sempre revalidado: com max-age, a arte
+  // recem-trocada continuava aparecendo a antiga por cinco minutos, e parecia
+  // que o envio nao tinha sido salvo. A revalidacao custa um 304 pequeno.
+  const cacheControl = 'private, no-cache';
 
   if (request.headers.get('if-none-match') === etag) {
     return new Response(null, {
