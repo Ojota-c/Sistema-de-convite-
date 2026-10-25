@@ -23,6 +23,13 @@ export interface EnvioDeArteProps {
   ajuda?: string;
   /** Rota que serve a arte ja salva, quando existe. */
   imagemAtual: string | null;
+  /**
+   * Se existe arte gravada no banco.
+   *
+   * Vem separado da previa de proposito: o selo tem de dizer a verdade sobre
+   * o banco mesmo que a previa, por qualquer motivo, nao carregue.
+   */
+  temArte: boolean;
   /** Texto alternativo da imagem ja salva. */
   textoAlternativo: string;
   acaoSalvar: Acao;
@@ -46,6 +53,7 @@ export function EnvioDeArte({
   rotulo,
   ajuda,
   imagemAtual,
+  temArte,
   textoAlternativo,
   acaoSalvar,
   acaoRemover,
@@ -139,9 +147,9 @@ export function EnvioDeArte({
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h3 className="font-medium">{rotulo}</h3>
         <span
-          className={`etiqueta ${imagemAtual ? 'etiqueta-confirmado' : 'etiqueta-sem-resposta'}`}
+          className={`etiqueta ${temArte ? 'etiqueta-confirmado' : 'etiqueta-sem-resposta'}`}
         >
-          {imagemAtual ? 'Arte enviada' : 'Falta a arte'}
+          {temArte ? 'Arte enviada' : 'Falta a arte'}
         </span>
       </div>
 
@@ -219,7 +227,7 @@ export function EnvioDeArte({
           {enviando ? 'Enviando...' : 'Salvar arte'}
         </button>
 
-        {imagemAtual && !processada ? (
+        {temArte && !processada ? (
           <form action={remover}>
             {Object.entries(camposExtras).map(([chave, valor]) => (
               <input key={chave} type="hidden" name={chave} value={valor} />

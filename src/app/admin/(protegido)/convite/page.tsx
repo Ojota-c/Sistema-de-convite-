@@ -34,11 +34,6 @@ export default async function PaginaDoConvite() {
     listarVariantes(),
   ]);
 
-  /** Um token que já tenha esta variante, para a prévia mostrar a arte certa. */
-  function tokenDaVariante(codigo: string): string | null {
-    return convidados.find((c) => c.variante === codigo)?.token ?? null;
-  }
-
   const primeiroToken = convidados[0]?.token ?? null;
   const exemploDeLink = `${urlBase()}/c/${primeiroToken ?? 'exemplo'}`;
   const faltando = variantesSemArte(variantes);
@@ -63,25 +58,23 @@ export default async function PaginaDoConvite() {
         ) : null}
 
         <div className="mt-5 grid gap-4 md:grid-cols-3">
-          {variantes.map((variante) => {
-            const token = tokenDaVariante(variante.codigo);
-            return (
-              <EnvioDeArte
-                key={variante.codigo}
-                id={`variante-${variante.codigo}`}
-                rotulo={variante.descricao}
-                ajuda={`Código ${variante.codigo}`}
-                imagemAtual={
-                  variante.temImagem && token ? `/c/${token}/imagem` : null
-                }
-                textoAlternativo={`Arte do convite para ${variante.descricao}`}
-                acaoSalvar={salvarArteDaVarianteAction}
-                acaoRemover={removerArteDaVarianteAction}
-                camposExtras={{ codigo: variante.codigo }}
-                compacto
-              />
-            );
-          })}
+          {variantes.map((variante) => (
+            <EnvioDeArte
+              key={variante.codigo}
+              id={`variante-${variante.codigo}`}
+              rotulo={variante.descricao}
+              ajuda={`Código ${variante.codigo}`}
+              imagemAtual={
+                variante.temImagem ? `/admin/arte/${variante.codigo}` : null
+              }
+              temArte={variante.temImagem}
+              textoAlternativo={`Arte do convite para ${variante.descricao}`}
+              acaoSalvar={salvarArteDaVarianteAction}
+              acaoRemover={removerArteDaVarianteAction}
+              camposExtras={{ codigo: variante.codigo }}
+              compacto
+            />
+          ))}
         </div>
 
         {variantes.length === 0 ? (
@@ -105,11 +98,8 @@ export default async function PaginaDoConvite() {
           <EnvioDeArte
             id="imagem-geral"
             rotulo="Imagem geral do evento"
-            imagemAtual={
-              evento.caminhoDaImagem && primeiroToken
-                ? `/c/${primeiroToken}/imagem`
-                : null
-            }
+            imagemAtual={evento.caminhoDaImagem ? '/admin/arte/evento' : null}
+            temArte={Boolean(evento.caminhoDaImagem)}
             textoAlternativo={`Imagem geral do convite de ${evento.titulo}`}
             acaoSalvar={salvarImagemAction}
             acaoRemover={removerImagemAction}
@@ -133,7 +123,13 @@ export default async function PaginaDoConvite() {
         <div className="mt-5">
           <PosicaoDoLink
             linha={evento.linhaDoLink}
-            urlDaArte={primeiroToken ? `/c/${primeiroToken}/imagem` : null}
+            urlDaArte={
+              variantes.find((v) => v.temImagem)
+                ? `/admin/arte/${variantes.find((v) => v.temImagem)!.codigo}`
+                : evento.caminhoDaImagem
+                  ? '/admin/arte/evento'
+                  : null
+            }
             linkDeExemplo={exemploDeLink}
           />
         </div>
